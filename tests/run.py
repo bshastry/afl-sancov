@@ -10,7 +10,7 @@ except ImportError:
 
 def main():
 
-    reporter = AFLSancov()
+    reporter = AFLSancovReporter()
     # cargs = reporter.parse_cmdline()
 
     ### config
