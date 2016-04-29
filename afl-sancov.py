@@ -47,8 +47,7 @@ class AFLSancovReporter:
     """Base class for the AFL Sancov reporter"""
 
     Version            = '0.1'
-    Description        = 'A tool to leverage Clang/LLVM coverage sanitizer instrumentation for ' \
-                         'coverage consolidation and delta debugging'
+    Description        = 'A tool for coverage consolidation and delta debugging'
     Want_Output        = True
     No_Output          = False
     Is_Crash_Regex     = re.compile(r"id.*,(sig:\d{2}),.*")
@@ -814,7 +813,7 @@ class AFLSancovReporter:
                 help="Path to coverage instrumented binary")
         p.add_argument("--dd-mode", action='store_true',
                 help="Experimental! Enables delta debugging mode. In this mode, coverage traces of crashing input\n"
-                     "and it's non-crashing parent are diff'ed (requires --dd-raw-queue-path).",
+                     "and it's non-crashing parent are diff'ed.",
                 default=False)
         # p.add_argument("--dd-raw-queue-path", type=str,
         #         help="Path to raw queue files (used in --dd-mode)")

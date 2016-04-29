@@ -39,8 +39,8 @@ class TestAflSanCov(unittest.TestCase):
     ### set a few paths
     tmp_file     = './tmp_cmd.out'
     version_file = '../VERSION'
-    afl_cov_cmd  = '../afl-sancov.py'
-    # single_generator   = './afl/afl-cov-generator.sh'
+    afl_cov_cmd  = './aflsancov.py'
+    single_generator   = './afl-sancov-generator.sh'
     # parallel_generator = './afl/afl-cov-generator-parallel.sh'
     # afl_cov_live       = './afl/afl-cov-generator-live.sh'
 
@@ -104,14 +104,14 @@ class TestAflSanCov(unittest.TestCase):
                 in ''.join(self.do_cmd("%s -h" % (self.afl_cov_cmd))),
                 "--verbose not in -h output")
 
-    # def test_overwrite_dir(self):
-    #     ### generate coverage, and then try to regenerate without --overwrite
-    #     self.do_cmd("%s --afl-queue-id-limit 1 --overwrite" \
-    #                     % (self.single_generator))
-    #     out_str = ''.join(self.do_cmd("%s --afl-queue-id-limit 1" \
-    #                     % (self.single_generator)))
-    #     self.assertTrue("use --overwrite" in out_str,
-    #             "Missing --overwrite not caught")
+    def test_overwrite_dir(self):
+        ### generate coverage, and then try to regenerate without --overwrite
+        self.do_cmd("%s --afl-queue-id-limit 1 --overwrite" \
+                        % (self.single_generator))
+        out_str = ''.join(self.do_cmd("%s --afl-queue-id-limit 1" \
+                        % (self.single_generator)))
+        self.assertTrue("use --overwrite" in out_str,
+                "Missing --overwrite not caught")
 
     # def test_stop_requires_fuzz_dir(self):
     #     self.assertTrue('Must set'

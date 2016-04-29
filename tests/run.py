@@ -30,8 +30,8 @@ def main():
     ### system commands that we require
     cmds = {
 #        'git':'',
-#        'sancov':'',
-#        'make':'',
+        'pysancov':'',
+        'sancov':'',
         'python':'',
     }
 
@@ -68,7 +68,7 @@ def main():
     #         fwknop_afl_compile, cmds, cargs)
 
     ### run the actual tests
-    print "[+] Running afl-cov tests (ignore 'Terminated' messages)..."
+    print "[+] Running afl-sancov tests (ignore 'Terminated' messages)..."
     subprocess.call("%s %s" % (cmds['python'], test_cmd),
             stdin=None, shell=True)
 
