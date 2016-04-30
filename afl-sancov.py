@@ -168,7 +168,7 @@ class AFLSancovReporter:
             self.run_cmd(self.args.coverage_cmd.replace('AFL_FILE', crash_fname), self.No_Output, sancov_env)
 
             ### Run pysancov rawunpack before calling rename
-            self.run_cmd("pysancov rawunpack *.raw.sancov; rm *.raw.sancov", self.No_Output)
+            self.run_cmd("pysancov rawunpack *.sancov.raw; rm *.sancov.raw *.sancov.map", self.No_Output)
 
             # This renames default sancov file to specified filename
             # and populates self.curr* report with non-crashing input's
