@@ -58,8 +58,12 @@ class AFLSancovReporter:
     line_cov_regex = re.compile(r"^(?P<function>[\w|\-|\:]+)$\n"
                              r"^(?P<filepath>[^:]+):(?P<linenum>\d+):(?P<colnum>\d+)$",
                              re.MULTILINE)
-    find_crash_parent_regex = re.compile(r"^(HARDEN|ASAN)\-(?P<session>[\w|\-]+):id.*?"
+    find_crash_parent_regex = re.compile(r"^(HARDEN\-|ASAN\-)?(?P<session>[\w|\-]+):id.*?"
                                          r"(sync:(?P<sync>[\w|\-]+))?,src:(?P<id>\d+).*$")
+
+    # find_crash_parent_regex = re.compile(r"^(?P<session>[\w|\-]+):id.*?"
+    #                                      r"(sync:(?P<sync>[\w|\-]+))?,src:(?P<id>\d+).*$")
+
 
     def __init__(self):
 
@@ -120,6 +124,9 @@ class AFLSancovReporter:
             return False
 
         crash_files = self.import_unique_crashes(unique_crash_path)
+
+        self.logr("\n*** Imported %d new crash files from: %s\n" \
+                % (len(crash_files), (self.args.afl_fuzzing_dir + '/unique')))
 
         for crash_fname in crash_files:
             # Find parent
