@@ -7,7 +7,7 @@
 #  Purpose: Leverage sancov towards coverage consolidation, delta debugging etc.
 #
 #  Forked off of afl-cov (ver 0.5): Copyright (C) 2015 Michael Rash (mbr@cipherdyne.org)
-#                afl-sancov: Copyright (C) 2016 Bhargava Shastry (bshastry@sec.t-labs.tu-berlin.de)
+#  Port to coverage sanitizer by Bhargava Shastry (bshastry@sec.t-labs.tu-berlin.de)
 #
 #  License (GNU General Public License):
 #
@@ -829,6 +829,10 @@ class AFLSancovReporter:
                 return False
         else:
             print "[*] --coverage-cmd missing"
+            return False
+
+        if not self.args.afl_fuzzing_dir:
+            print "[*] --afl-fuzzing-dir missing"
             return False
 
         if not self.args.bin_path:
