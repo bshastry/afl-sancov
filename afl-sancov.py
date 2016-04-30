@@ -50,7 +50,6 @@ class AFLSancovReporter:
     Description        = 'A tool for coverage consolidation and delta debugging'
     Want_Output        = True
     No_Output          = False
-    Is_Crash_Regex     = re.compile(r"id.*,(sig:\d{2}),.*")
 
     # func_cov_regex = re.compile(r"^(?P<filepath>[^:]+):(?P<linenum>\d+)\s" \
     #                             "(?P<function>[\w|\-|\:]+)$", re.MULTILINE)
@@ -58,11 +57,15 @@ class AFLSancovReporter:
     line_cov_regex = re.compile(r"^(?P<function>[\w|\-|\:]+)$\n"
                              r"^(?P<filepath>[^:]+):(?P<linenum>\d+):(?P<colnum>\d+)$",
                              re.MULTILINE)
-    find_crash_parent_regex = re.compile(r"^(HARDEN\-|ASAN\-)?(?P<session>[\w|\-]+):id.*?"
-                                         r"(sync:(?P<sync>[\w|\-]+))?,src:(?P<id>\d+).*$")
 
-    # find_crash_parent_regex = re.compile(r"^(?P<session>[\w|\-]+):id.*?"
+    # Is_Crash_Regex     = re.compile(r"id.*,(sig:\d{2}),.*")
+    # find_crash_parent_regex = re.compile(r"^(HARDEN\-|ASAN\-)?(?P<session>[\w|\-]+):id.*?"
     #                                      r"(sync:(?P<sync>[\w|\-]+))?,src:(?P<id>\d+).*$")
+
+
+    # This regex merges legacy Is_Crash_Regex and namesake
+    find_crash_parent_regex = re.compile(r"^(HARDEN\-|ASAN\-)?(?P<session>[\w|\-]+):id:\d+,sig:\d+,"
+                                         r"(sync:(?P<sync>[\w|\-]+),)?src:(?P<id>\d+).*$")
 
 
     def __init__(self):
@@ -163,6 +166,9 @@ class AFLSancovReporter:
             ### for the current AFL test case file
             sancov_env = self.get_sancov_env(self.cov_paths['crash_sancov_raw'], cbasename)
             self.run_cmd(self.args.coverage_cmd.replace('AFL_FILE', crash_fname), self.No_Output, sancov_env)
+
+            ### Run pysancov rawunpack before calling rename
+            self.run_cmd("pysancov rawunpack *.raw.sancov; rm *.raw.sancov", self.No_Output)
 
             # This renames default sancov file to specified filename
             # and populates self.curr* report with non-crashing input's
@@ -542,13 +548,13 @@ class AFLSancovReporter:
 
         sancov_env = os.environ.copy()
         if self.args.sanitizer == "asan":
-            if self.Is_Crash_Regex.match(afl_input):
+            if self.find_crash_parent_regex.match(afl_input):
                 sancov_env['ASAN_OPTIONS'] = 'coverage=1:coverage_direct=1:' \
                                              'coverage_dir=%s' %fpath
             else:
                 sancov_env['ASAN_OPTIONS'] = 'coverage=1:coverage_dir=%s' %fpath
         else:
-            if self.Is_Crash_Regex.match(afl_input):
+            if self.find_crash_parent_regex.match(afl_input):
                 sancov_env['UBSAN_OPTIONS'] = 'coverage=1:coverage_direct=1:' \
                                               'coverage_dir=%s' %fpath
             else:
