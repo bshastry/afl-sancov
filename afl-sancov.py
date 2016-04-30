@@ -221,8 +221,10 @@ class AFLSancovReporter:
                         + " -name id:" + src_id + "*"
         parent_fname = subprocess.check_output(search_cmd, stderr=subprocess.STDOUT, shell=True)
 
-        assert (len(filter(None, parent_fname.split("\n"))) == 1), \
-            "Multiple parent matches for crash file!"
+        if (len(filter(None, parent_fname.split("\n"))) != 1):
+            self.logr("Parents found: {}".format(parent_fname))
+            print "[*] Parents found: {}".format(parent_fname)
+            assert False, "Multiple or no parent matches for crash file!"
 
         return os.path.abspath(parent_fname.rstrip("\n"))
 
