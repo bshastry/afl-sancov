@@ -827,6 +827,9 @@ class AFLSancovReporter:
             if 'AFL_FILE' not in self.args.coverage_cmd:
                 print "[*] --coverage-cmd must contain AFL_FILE"
                 return False
+        else:
+            print "[*] --coverage-cmd missing"
+            return False
 
         if not self.args.bin_path:
             print "[*] Please provide path to coverage " \
