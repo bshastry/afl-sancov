@@ -167,8 +167,13 @@ class AFLSancovReporter:
             sancov_env = self.get_sancov_env(self.cov_paths['crash_sancov_raw'], cbasename)
             self.run_cmd(self.args.coverage_cmd.replace('AFL_FILE', crash_fname), self.No_Output, sancov_env)
 
+            globstrraw = os.path.basename("".join(glob.glob(self.cov_paths['delta_diff_dir'] + "/*.sancov.raw")))
+            globstrmap = os.path.basename("".join(glob.glob(self.cov_paths['delta_diff_dir'] + "/*.sancov.map")))
             ### Run pysancov rawunpack before calling rename
-            self.run_cmd("pysancov rawunpack *.sancov.raw; rm *.sancov.raw *.sancov.map", self.No_Output)
+            self.run_cmd("cd {}; pysancov rawunpack {} ; rm {} {}".format(self.cov_paths['delta_diff_dir'],
+                                                                          globstrraw, globstrraw, globstrmap),
+                                                                            self.No_Output)
+            # self.run_cmd("cd pysancov rawunpack " + globstrraw + " ; rm " + globstrraw + " " + globstrmap, self.No_Output)
 
             # This renames default sancov file to specified filename
             # and populates self.curr* report with non-crashing input's
