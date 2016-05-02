@@ -37,6 +37,7 @@ from argparse import ArgumentParser
 import time
 import signal
 import sys, os
+from itertools import groupby
 
 try:
     import subprocess32 as subprocess
@@ -85,9 +86,12 @@ class AFLSancovReporter:
 
         ### For use in dd-mode
         self.crashdd_pos_report = set()
-        self.crashdd_zero_report = set()
+        # self.crashdd_zero_report = set()
         self.parentdd_pos_report = set()
-        self.parentdd_zero_report = set()
+        # self.parentdd_zero_report = set()
+
+        ### List of all tuples singularly in crash positive reports
+        self.crashdd_pos_list = []
 
     def setup_parsing(self):
         self.bin_name = os.path.basename(self.args.bin_path)
@@ -111,6 +115,17 @@ class AFLSancovReporter:
         else:
             return not self.process_afl_crash()
 
+    def dd_obtain_stats(self):
+        with open(self.cov_paths['dd_final_stats'], 'a') as file:
+            for key, group in groupby(self.crashdd_pos_list, key=lambda x : (x[0], x[2], x[3])):
+                grouplist = list(group)
+                grouplen = len(grouplist)
+                print >>file, "File: {}\n" \
+                                "Function: {}\n" \
+                                "Line: {}  Col: {}\n".format(grouplist[0][0], grouplist[0][1],
+                                                             grouplist[0][2], grouplist[0[3]])
+                print >>file, "Executed {} times\n".format(grouplen)
+        return
 
     def process_afl_crash(self):
 
@@ -216,9 +231,11 @@ class AFLSancovReporter:
             self.crashdd_pos_report = self.curr_pos_report.difference(self.prev_pos_report)
 
             self.crashdd_pos_report = sorted(self.crashdd_pos_report, \
-                                            key=lambda cov_entry: cov_entry[0])
+                                            key=lambda cov_entry: (cov_entry[0], cov_entry[2], cov_entry[3]))
             gp = self.linecov_report_to_str(self.crashdd_pos_report)
 
+            # Extend the global list with current crash delta diff
+            self.crashdd_pos_list.extend(self.crashdd_pos_report)
 
             crashdd_outfile = self.cov_paths['delta_diff_dir'] + '/' + cbasename + '.dd'
 
@@ -247,6 +264,8 @@ class AFLSancovReporter:
         covered = self.cov_paths['delta_diff_dir'] + '/covered.txt'
         if os.path.isfile(covered):
             os.remove(covered)
+
+        self.dd_obtain_stats()
 
         return True
 
@@ -438,7 +457,8 @@ class AFLSancovReporter:
             self.cov_paths['crash_afl'] = ''
             self.cov_paths['parent_sancov_raw'] = ''
             self.cov_paths['crash_sancov_raw'] = ''
-
+            self.cov_paths['dd_stash_dir'] = self.cov_paths['delta_diff_dir'] + '/.raw'
+            self.cov_paths['dd_final_stats'] = self.cov_paths['delta_diff_dir'] + '/final_stats.dd'
 
         self.cov_paths['top_dir']  = self.args.afl_fuzzing_dir + '/sancov'
         # Web dir is for sancov 3.9 only. Currently unsupported.
@@ -449,7 +469,6 @@ class AFLSancovReporter:
         self.cov_paths['diff_dir'] = self.cov_paths['top_dir'] + '/diff'
         # Diff in delta debug mode
         self.cov_paths['delta_diff_dir'] = self.cov_paths['top_dir'] + '/delta-diff'
-        self.cov_paths['dd_stash_dir'] = self.cov_paths['delta_diff_dir'] + '/.raw'
         self.cov_paths['log_file'] = self.cov_paths['top_dir'] + '/afl-sancov.log'
         self.cov_paths['tmp_out']  = self.cov_paths['top_dir'] + '/cmd-out.tmp'
 
