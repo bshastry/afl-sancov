@@ -556,24 +556,24 @@ class AFLSancovReporter:
 
         return
 
-    def gen_paths_ddmode(self, afl_file):
-
-        basename = os.path.basename(afl_file)
-
-        cp = self.cov_paths
-
-        ### raw sancov file
-        cp['sancov_raw'] = self.cov_paths['delta_diff_dir'] + \
-                '/' + basename + '.sancov'
-
-        ### For a single delta-diff run, prev_file should point to
-        ### non-crashing input (parent of crash file)
-        if cp['prev_file']:
-            cp['prev_sancov_raw'] = self.cov_paths['delta_diff_dir'] + '/' \
-                    + os.path.basename(cp['prev_file']) \
-                    + '.sancov'
-
-        return
+    # def gen_paths_ddmode(self, afl_file):
+    #
+    #     basename = os.path.basename(afl_file)
+    #
+    #     cp = self.cov_paths
+    #
+    #     ### raw sancov file
+    #     cp['sancov_raw'] = self.cov_paths['delta_diff_dir'] + \
+    #             '/' + basename + '.sancov'
+    #
+    #     ### For a single delta-diff run, prev_file should point to
+    #     ### non-crashing input (parent of crash file)
+    #     if cp['prev_file']:
+    #         cp['prev_sancov_raw'] = self.cov_paths['delta_diff_dir'] + '/' \
+    #                 + os.path.basename(cp['prev_file']) \
+    #                 + '.sancov'
+    #
+    #     return
 
     def get_sancov_env_for_afl_input(self, fuzz_dir, afl_input):
 
