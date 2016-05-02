@@ -448,20 +448,6 @@ class AFLSancovReporter:
 
     def init_tracking(self):
 
-        # In dd-mode, we don't need to care about fuzz-dirs
-        # So, we track current and previous files one level up
-        if not self.args.dd_mode:
-            self.cov_paths['dirs'] = {}
-        else:
-            self.cov_paths['parent_afl'] = ''
-            self.cov_paths['crash_afl'] = ''
-            self.cov_paths['parent_sancov_raw'] = ''
-            self.cov_paths['crash_sancov_raw'] = ''
-            # Diff in delta debug mode
-            self.cov_paths['delta_diff_dir'] = self.cov_paths['top_dir'] + '/delta-diff'
-            self.cov_paths['dd_stash_dir'] = self.cov_paths['delta_diff_dir'] + '/.raw'
-            self.cov_paths['dd_final_stats'] = self.cov_paths['delta_diff_dir'] + '/final_stats.dd'
-
         self.cov_paths['top_dir']  = self.args.afl_fuzzing_dir + '/sancov'
         # Web dir is for sancov 3.9 only. Currently unsupported.
         self.cov_paths['web_dir']  = self.cov_paths['top_dir'] + '/web'
@@ -476,6 +462,20 @@ class AFLSancovReporter:
         self.cov_paths['id_delta_cov'] = self.cov_paths['top_dir'] + '/id-delta-cov'
         self.cov_paths['zero_cov']     = self.cov_paths['top_dir'] + '/zero-cov'
         self.cov_paths['pos_cov']      = self.cov_paths['top_dir'] + '/pos-cov'
+
+        # In dd-mode, we don't need to care about fuzz-dirs
+        # So, we track current and previous files one level up
+        if not self.args.dd_mode:
+            self.cov_paths['dirs'] = {}
+        else:
+            self.cov_paths['parent_afl'] = ''
+            self.cov_paths['crash_afl'] = ''
+            self.cov_paths['parent_sancov_raw'] = ''
+            self.cov_paths['crash_sancov_raw'] = ''
+            # Diff in delta debug mode
+            self.cov_paths['delta_diff_dir'] = self.cov_paths['top_dir'] + '/delta-diff'
+            self.cov_paths['dd_stash_dir'] = self.cov_paths['delta_diff_dir'] + '/.raw'
+            self.cov_paths['dd_final_stats'] = self.cov_paths['delta_diff_dir'] + '/final_stats.dd'
 
         if self.args.overwrite:
             self.init_mkdirs()
