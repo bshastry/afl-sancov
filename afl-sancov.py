@@ -124,7 +124,7 @@ class AFLSancovReporter:
                                 "Function: {}\n" \
                                 "Line: {}  Col: {}\n".format(grouplist[0][0], grouplist[0][1],
                                                              grouplist[0][2], grouplist[0][3])
-                print >>file, "Executed {} times\n".format(grouplen)
+                print >>file, "Executed {} time(s)\n".format(grouplen)
         return
 
     def process_afl_crash(self):
