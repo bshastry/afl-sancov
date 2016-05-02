@@ -457,6 +457,8 @@ class AFLSancovReporter:
             self.cov_paths['crash_afl'] = ''
             self.cov_paths['parent_sancov_raw'] = ''
             self.cov_paths['crash_sancov_raw'] = ''
+            # Diff in delta debug mode
+            self.cov_paths['delta_diff_dir'] = self.cov_paths['top_dir'] + '/delta-diff'
             self.cov_paths['dd_stash_dir'] = self.cov_paths['delta_diff_dir'] + '/.raw'
             self.cov_paths['dd_final_stats'] = self.cov_paths['delta_diff_dir'] + '/final_stats.dd'
 
@@ -467,8 +469,6 @@ class AFLSancovReporter:
         self.cov_paths['cons_dir'] = self.cov_paths['top_dir'] + '/cons-cov'
         # Diff for queue inputs only.
         self.cov_paths['diff_dir'] = self.cov_paths['top_dir'] + '/diff'
-        # Diff in delta debug mode
-        self.cov_paths['delta_diff_dir'] = self.cov_paths['top_dir'] + '/delta-diff'
         self.cov_paths['log_file'] = self.cov_paths['top_dir'] + '/afl-sancov.log'
         self.cov_paths['tmp_out']  = self.cov_paths['top_dir'] + '/cmd-out.tmp'
 
