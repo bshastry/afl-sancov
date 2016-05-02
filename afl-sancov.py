@@ -123,7 +123,7 @@ class AFLSancovReporter:
                 print >>file, "File: {}\n" \
                                 "Function: {}\n" \
                                 "Line: {}  Col: {}\n".format(grouplist[0][0], grouplist[0][1],
-                                                             grouplist[0][2], grouplist[0[3]])
+                                                             grouplist[0][2], grouplist[0][3])
                 print >>file, "Executed {} times\n".format(grouplen)
         return
 
