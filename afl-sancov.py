@@ -84,10 +84,10 @@ class AFLSancovReporter:
         self.prev_zero_report = set()
 
         ### For use in dd-mode
-        self.crash_pos_report = set()
-        self.crash_zero_report = set()
-        self.parent_pos_report = set()
-        self.parent_zero_report = set()
+        self.crashdd_pos_report = set()
+        self.crashdd_zero_report = set()
+        self.parentdd_pos_report = set()
+        self.parentdd_zero_report = set()
 
     def setup_parsing(self):
         self.bin_name = os.path.basename(self.args.bin_path)
@@ -127,18 +127,45 @@ class AFLSancovReporter:
             return False
 
         crash_files = self.import_unique_crashes(unique_crash_path)
+        num_crash_files = len(crash_files)
 
         self.logr("\n*** Imported %d new crash files from: %s\n" \
-                % (len(crash_files), (self.args.afl_fuzzing_dir + '/unique')))
+                % (num_crash_files, (self.args.afl_fuzzing_dir + '/unique')))
+
+        crash_file_counter = 0
 
         for crash_fname in crash_files:
+
+            crash_file_counter += 1
+            self.logr("[+] Processing crash file ({}/{})".format(crash_file_counter, num_crash_files))
+
             # Find parent
             pname = self.find_parent_crashing(crash_fname)
+            # Base names
+            cbasename = os.path.basename(crash_fname)
+            pbasename = os.path.basename(pname)
+
+            ### AFL corpus sometimes contains parent file that is identical to crash file
+            ### Skip them for the moment.
+            try:
+                diff_out = subprocess.check_output("diff -q {} {}".format(crash_fname, pname),
+                                                   stderr=subprocess.STDOUT, shell=True)
+            except Exception, e:
+                diff_out = e.output
+
+            if not diff_out.rstrip("\n"):
+                self.logr("Crash file ({}) and parent ({}) are identical! Ignoring.".format(cbasename, pbasename))
+                continue
+
+            cov_cmd = self.args.coverage_cmd.replace('AFL_FILE', pname)
+
+            ### Dry-run to make sure parent doesn't cause a crash
+            if self.does_dry_run_throw_error(cov_cmd):
+                self.logr("Parent ({}) crashes binary! Ignoring.".format(pbasename))
+                continue
 
             #### The output should be written to delta-diff dir
             #### as afl_input namesake witha sancov extension
-            pbasename = os.path.basename(pname)
-
             ### raw sancov file
             self.cov_paths['parent_sancov_raw'] = self.cov_paths['delta_diff_dir'] + \
                 '/' + pbasename + '.sancov'
@@ -147,7 +174,7 @@ class AFLSancovReporter:
             ### execute the command to generate code coverage stats
             ### for the current AFL test case file
             sancov_env = self.get_sancov_env(self.cov_paths['parent_sancov_raw'], pbasename)
-            self.run_cmd(self.args.coverage_cmd.replace('AFL_FILE', pname), self.No_Output, sancov_env)
+            self.run_cmd(cov_cmd, self.No_Output, sancov_env)
 
             # This renames default sancov file to specified filename
             # and populates self.curr* report with non-crashing input's
@@ -157,15 +184,20 @@ class AFLSancovReporter:
             self.prev_pos_report = self.curr_pos_report
             self.prev_zero_report = self.curr_zero_report
 
-            cbasename = os.path.basename(crash_fname)
             self.cov_paths['crash_sancov_raw'] = self.cov_paths['delta_diff_dir'] + \
                 '/' + cbasename + '.sancov'
             self.cov_paths['crash_afl'] = cbasename
 
+            ### Make sure crashing input indeed triggers a program crash
+            cov_cmd = self.args.coverage_cmd.replace('AFL_FILE', crash_fname)
+            if not self.does_dry_run_throw_error(cov_cmd):
+                self.logr("Crash input ({}) does not crash the program! Ignoring.".format(cbasename))
+                continue
+
             ### execute the command to generate code coverage stats
             ### for the current AFL test case file
             sancov_env = self.get_sancov_env(self.cov_paths['crash_sancov_raw'], cbasename)
-            self.run_cmd(self.args.coverage_cmd.replace('AFL_FILE', crash_fname), self.No_Output, sancov_env)
+            self.run_cmd(cov_cmd, self.No_Output, sancov_env)
 
             globstrraw = os.path.basename("".join(glob.glob(self.cov_paths['delta_diff_dir'] + "/*.sancov.raw")))
             globstrmap = os.path.basename("".join(glob.glob(self.cov_paths['delta_diff_dir'] + "/*.sancov.map")))
@@ -181,29 +213,29 @@ class AFLSancovReporter:
             self.rename_and_extract_linecov(self.cov_paths['crash_sancov_raw'])
 
             # Obtain Pc.difference(Pnc) and write to file
-            self.global_pos_report = self.curr_pos_report.difference(self.prev_pos_report)
+            self.crashdd_pos_report = self.curr_pos_report.difference(self.prev_pos_report)
 
-            self.global_pos_report = sorted(self.global_pos_report, \
+            self.crashdd_pos_report = sorted(self.crashdd_pos_report, \
                                             key=lambda cov_entry: cov_entry[0])
-            gp = self.linecov_report_to_str(self.global_pos_report)
+            gp = self.linecov_report_to_str(self.crashdd_pos_report)
 
 
-            outfile = self.cov_paths['delta_diff_dir'] + '/' + cbasename + '.dd'
+            crashdd_outfile = self.cov_paths['delta_diff_dir'] + '/' + cbasename + '.dd'
 
             header = "diff crash ({}) -> parent ({})".format(cbasename, pbasename)
-            self.write_file(header, outfile)
-            self.write_strlist_to_file(gp, outfile)
+            self.write_file(header, crashdd_outfile)
+            self.write_strlist_to_file(gp, crashdd_outfile)
 
             ### Delete later
-            tmpoutfile = self.cov_paths['delta_diff_dir'] + '/' + pbasename + '.dd'
+            parentdd_outfile = self.cov_paths['delta_diff_dir'] + '/' + pbasename + '.dd'
             header = "diff parent ({}) -> crash ({})".format(pbasename, cbasename)
-            self.write_file(header, tmpoutfile)
+            self.write_file(header, parentdd_outfile)
 
-            tmp = self.prev_pos_report.difference(self.curr_pos_report)
-            tmp = sorted(tmp, key=lambda cov_entry: cov_entry[0])
-            tmpgp = self.linecov_report_to_str(tmp)
+            self.parentdd_pos_report = self.prev_pos_report.difference(self.curr_pos_report)
+            self.parentdd_pos_report = sorted(self.parentdd_pos_report, key=lambda cov_entry: cov_entry[0])
+            parentgp = self.linecov_report_to_str(self.parentdd_pos_report)
 
-            self.write_strlist_to_file(tmpgp, tmpoutfile)
+            self.write_strlist_to_file(parentgp, parentdd_outfile)
 
         ### Stash away all raw sancov files
         stash_dst = self.cov_paths['dd_stash_dir']
@@ -301,15 +333,19 @@ class AFLSancovReporter:
 
                     assert self.args.coverage_cmd, "Missing coverage cmd! We shouldn't be here!"
 
+                    ### Dry run to eliminate queue inputs that crash program
+                    cov_cmd = self.args.coverage_cmd.replace('AFL_FILE', f)
+                    if self.does_dry_run_throw_error(cov_cmd):
+                        self.logr("Queue file ({}) crashes the program! Ignoring.".format(f))
+                        continue
+
                     ### execute the command to generate code coverage stats
                     ### for the current AFL test case file
                     sancov_env = self.get_sancov_env_for_afl_input(fuzz_dir, os.path.basename(f))
                     if has_run_once:
-                        self.run_cmd(self.args.coverage_cmd.replace('AFL_FILE', f),
-                                self.No_Output, sancov_env)
+                        self.run_cmd(cov_cmd, self.No_Output, sancov_env)
                     else:
-                        out_lines = self.run_cmd(self.args.coverage_cmd.replace('AFL_FILE', f),
-                                self.Want_Output, sancov_env)
+                        out_lines = self.run_cmd(cov_cmd, self.Want_Output, sancov_env)
                         has_run_once = True
 
                     ### Extract sancov stats for this test case
@@ -721,6 +757,17 @@ class AFLSancovReporter:
         if os.path.exists(prev_raw_filepath):
             os.remove(prev_raw_filepath)
         return
+
+    # Credit: http://stackoverflow.com/a/1104641/4712439
+    def does_dry_run_throw_error(self, cmd):
+
+        try:
+            out = subprocess.check_output(cmd, stderr=subprocess.STDOUT, shell=True)
+        except Exception, e:
+            return (e.returncode > 128)
+
+        return False
+
 
     def run_cmd(self, cmd, collect, env=None):
 
