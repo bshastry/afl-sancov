@@ -115,16 +115,27 @@ class AFLSancovReporter:
         else:
             return not self.process_afl_crash()
 
+    def deserialize_stats(self):
+        for idx, tpl in enumerate(self.crashdd_pos_list):
+            self.crashdd_pos_list[idx] = ':'.join(str(val) for val in tpl)
+        return
+
+
     def dd_obtain_stats(self):
+
+        sorted_list = []
+        self.deserialize_stats()
+
+        for key, group in groupby(self.crashdd_pos_list):
+            grouplist = list(group)
+            grouplen = len(grouplist)
+            sorted_list.append((grouplen, grouplist[0]))
+
+        sorted_list = sorted(sorted_list, key=lambda x: x[0], reverse=True)
         with open(self.cov_paths['dd_final_stats'], 'a') as file:
-            for key, group in groupby(self.crashdd_pos_list, key=lambda x : (x[0], x[2], x[3])):
-                grouplist = list(group)
-                grouplen = len(grouplist)
-                print >>file, "File: {}\n" \
-                                "Function: {}\n" \
-                                "Line: {}  Col: {}\n".format(grouplist[0][0], grouplist[0][1],
-                                                             grouplist[0][2], grouplist[0][3])
-                print >>file, "Executed {} time(s)\n".format(grouplen)
+            for tpl in sorted_list:
+                print >>file, "{}, {}".format(tpl[0], tpl[1])
+
         return
 
     def process_afl_crash(self):
