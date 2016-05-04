@@ -3,26 +3,28 @@
 #include <string.h>
 #include <unistd.h>
 
+void bug() {
+	abort();
+}
+
 int main(int argc, char* argv[]) {
-  char buf[100];
+	char buf[10];
+	int bytes_read = 0;
 
-//  while (__AFL_LOOP(1000)) {
-     /* Reset state. */
-     memset(buf, 0, 100);
+	/* Reset state. */
+	memset(buf, 0, 10);
 
-     /* Read input data. */
-     read(0, buf, 100);
+	/* Read input data. */
+	bytes_read = read(0, buf, 10);
 
-     /* Parse it in some vulnerable way. You'd normally call a library here. */
-     if (buf[0] != 'p') 
-	puts("error 1");
-     else if (buf[1] != 'w')
-	puts("error 2");
-     else if (buf[2] != 'n')
-	puts("error 3");
-     else
-	abort();	// Bug
-//  } // End-while-loop
+	if (!bytes_read)
+		return 1;
 
-  return 0;
+	/* Parse it in some vulnerable way. You'd normally call a library here. */
+	if (!strcmp(buf, "pwn"))
+		bug();
+	else
+		puts("works!");
+
+	return 0;
 }

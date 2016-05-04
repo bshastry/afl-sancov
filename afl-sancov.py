@@ -65,7 +65,7 @@ class AFLSancovReporter:
 
 
     # This regex merges legacy Is_Crash_Regex and namesake
-    find_crash_parent_regex = re.compile(r"^(HARDEN\-|ASAN\-)?(?P<session>[\w|\-]+):id:\d+,sig:\d+,"
+    find_crash_parent_regex = re.compile(r"^(HARDEN\-|ASAN\-)?((?P<session>[\w|\-]+):)?id:\d+,sig:\d+,"
                                          r"(sync:(?P<sync>[\w|\-]+),)?src:(?P<id>\d+).*$")
 
 
@@ -180,14 +180,17 @@ class AFLSancovReporter:
                 diff_out = e.output
 
             if not diff_out.rstrip("\n"):
-                self.logr("Crash file ({}) and parent ({}) are identical! Ignoring.".format(cbasename, pbasename))
+                self.logr("Crash file ({}) and parent ({}) are identical! Filtering crash file."
+                          .format(cbasename, pbasename))
+                os.rename(crash_fname, self.cov_paths['dd_filter_dir'] + '/' + cbasename)
                 continue
 
             cov_cmd = self.args.coverage_cmd.replace('AFL_FILE', pname)
 
             ### Dry-run to make sure parent doesn't cause a crash
             if self.does_dry_run_throw_error(cov_cmd):
-                self.logr("Parent ({}) crashes binary! Ignoring.".format(pbasename))
+                self.logr("Parent ({}) crashes binary! Filtering crash file.".format(pbasename))
+                os.rename(crash_fname, self.cov_paths['dd_filter_dir'] + '/' + cbasename)
                 continue
 
             #### The output should be written to delta-diff dir
@@ -217,7 +220,9 @@ class AFLSancovReporter:
             ### Make sure crashing input indeed triggers a program crash
             cov_cmd = self.args.coverage_cmd.replace('AFL_FILE', crash_fname)
             if not self.does_dry_run_throw_error(cov_cmd):
-                self.logr("Crash input ({}) does not crash the program! Ignoring.".format(cbasename))
+                self.logr("Crash input ({}) does not crash the program! Filtering crash file."
+                          .format(cbasename))
+                os.rename(crash_fname, self.cov_paths['dd_filter_dir'] + '/' + cbasename)
                 continue
 
             ### execute the command to generate code coverage stats
@@ -285,12 +290,16 @@ class AFLSancovReporter:
         crash_base_fname = os.path.basename(crash_fname)
         # (bintype, session, sync, syncname, src_id)
         match = self.find_crash_parent_regex.match(crash_base_fname)
-        (bintype, session, sync, syncname, src_id) = match.groups()
-        searchdir = session
-        if sync:
-            searchdir = syncname
+        (bintype, session, delim, sync, syncname, src_id) = match.groups()
 
-        search_cmd = "find " + self.args.afl_fuzzing_dir + "/" + searchdir + "/queue" + " -maxdepth 1" \
+        if sync:
+            searchdir = syncname + '/'
+        elif session:
+            searchdir = session + '/'
+        else:
+            searchdir = ''
+
+        search_cmd = "find " + self.args.afl_fuzzing_dir + "/" + searchdir + "queue" + " -maxdepth 1" \
                         + " -name id:" + src_id + "*"
         parent_fname = subprocess.check_output(search_cmd, stderr=subprocess.STDOUT, shell=True)
 
@@ -486,6 +495,7 @@ class AFLSancovReporter:
             # Diff in delta debug mode
             self.cov_paths['delta_diff_dir'] = self.cov_paths['top_dir'] + '/delta-diff'
             self.cov_paths['dd_stash_dir'] = self.cov_paths['delta_diff_dir'] + '/.raw'
+            self.cov_paths['dd_filter_dir'] = self.cov_paths['delta_diff_dir'] + '/.filter'
             self.cov_paths['dd_final_stats'] = self.cov_paths['delta_diff_dir'] + '/final_stats.dd'
 
         if self.args.overwrite:
@@ -1001,8 +1011,11 @@ class AFLSancovReporter:
             create_cov_dirs = 1
 
         if create_cov_dirs:
-            for k in ['top_dir', 'web_dir', 'cons_dir', 'diff_dir', 'delta_diff_dir', 'dd_stash_dir']:
+            for k in ['top_dir', 'web_dir', 'cons_dir', 'diff_dir']:
                 os.mkdir(self.cov_paths[k])
+            if self.args.dd_mode:
+                for k in ['delta_diff_dir', 'dd_stash_dir', 'dd_filter_dir']:
+                    os.mkdir(self.cov_paths[k])
 
             ### write coverage results in the following format
             cfile = open(self.cov_paths['id_delta_cov'], 'w')
