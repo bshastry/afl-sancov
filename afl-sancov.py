@@ -290,9 +290,9 @@ class AFLSancovReporter:
         crash_base_fname = os.path.basename(crash_fname)
         # (bintype, session, sync, syncname, src_id)
         match = self.find_crash_parent_regex.match(crash_base_fname)
-        (bintype, session, delim, sync, syncname, src_id) = match.groups()
+        (bintype, _, session, __, syncname, src_id) = match.groups()
 
-        if sync:
+        if syncname:
             searchdir = syncname + '/'
         elif session:
             searchdir = session + '/'
