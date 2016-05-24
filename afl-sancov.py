@@ -40,6 +40,7 @@ import sys, os
 from itertools import groupby
 import random
 import collections
+import json
 
 try:
     import subprocess32 as subprocess
@@ -129,17 +130,18 @@ class AFLSancovReporter:
             self.crashdd_pos_list[idx] = ':'.join(str(val) for val in tpl)
         return
 
-    def dd_obtain_stats_(self, filename):
+    def dd_obtain_stats_collections(self, crashfile, jsonfilename):
 
-        sorted_list = []
+        dict = {"crashing-input": crashfile, "diff-node-spec": []}
         self.deserialize_stats()
 
         counter = collections.Counter(self.crashdd_pos_list)
 
         sorted_list = counter.most_common()
-        with open(filename, 'a') as file:
-            for tpl in sorted_list:
-                print >>file, "{}, {}".format(tpl[1], tpl[0])
+        for tpl in sorted_list:
+            dict['diff-node-spec'].append({'line': tpl[0], 'count': tpl[1]})
+
+        self.dd_write_json(jsonfilename, dict)
 
         return
 
@@ -163,6 +165,9 @@ class AFLSancovReporter:
 
         return
 
+    def dd_write_json(self, filename, dict):
+        with open(filename, "w") as file:
+            json.dump(dict, file, indent=4)
 
     def process_afl_crash_deep(self):
 
@@ -304,11 +309,11 @@ class AFLSancovReporter:
                 self.crashdd_pos_list.extend(self.crashdd_pos_report)
 
 
-            crashdd_outfile = self.cov_paths['delta_diff_dir'] + '/' + cbasename + '.dd'
+            crashdd_outfile = self.cov_paths['delta_diff_dir'] + '/' + cbasename + '.json'
 
-            header = "diff crash ({}) -> parent ({})".format(cbasename, pbasename)
-            self.write_file(header, crashdd_outfile)
-            self.dd_obtain_stats_(crashdd_outfile)
+            # header = "diff crash ({}) -> parent ({})".format(cbasename, pbasename)
+            # self.write_file(header, crashdd_outfile)
+            self.dd_obtain_stats_collections(cbasename, crashdd_outfile)
             self.crashdd_pos_list = []
 
         ### Stash away all raw sancov files
