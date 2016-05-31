@@ -68,7 +68,10 @@ class AFLSancovReporter:
 
 
     # This regex merges legacy Is_Crash_Regex and namesake
-    find_crash_parent_regex = re.compile(r"^(HARDEN\-|ASAN\-)?((?P<session>[\w|\-]+):)?id:\d+,sig:\d+,"
+    old_find_crash_parent_regex = re.compile(r"^(HARDEN\-|ASAN\-)?((?P<session>[\w|\-]+):)?id:\d+,sig:\d+,"
+                                         r"(sync:(?P<sync>[\w|\-]+),)?src:(?P<id>\d+).*$")
+
+    find_crash_parent_regex = re.compile(r"^((HARDEN:|ASAN:)\d+,)?((?P<session>[\w|\-]+):)?id:\d+,sig:\d+,"
                                          r"(sync:(?P<sync>[\w|\-]+),)?src:(?P<id>\d+).*$")
 
 
