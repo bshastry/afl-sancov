@@ -133,9 +133,12 @@ class AFLSancovReporter:
             self.crashdd_pos_list[idx] = ':'.join(str(val) for val in tpl)
         return
 
-    def dd_obtain_stats_collections(self, crashfile, jsonfilename):
+    def dd_obtain_stats_collections(self, crashfile, jsonfilename, parentfile=None):
 
-        dict = {"crashing-input": crashfile, "diff-node-spec": []}
+        if parentfile:
+            dict = {"crashing-input": crashfile, "parent-input": parentfile, "diff-node-spec": []}
+        else:
+            dict = {"crashing-input": crashfile, "diff-node-spec": []}
         self.deserialize_stats()
 
         counter = collections.Counter(self.crashdd_pos_list)
@@ -441,29 +444,39 @@ class AFLSancovReporter:
             # Obtain Pc.difference(Pnc) and write to file
             self.crashdd_pos_report = self.curr_pos_report.difference(self.prev_pos_report)
 
-            self.crashdd_pos_report = sorted(self.crashdd_pos_report, \
+            self.crashdd_pos_list = sorted(self.crashdd_pos_report, \
                                             key=lambda cov_entry: (cov_entry[0], cov_entry[2], cov_entry[3]))
-            gp = self.linecov_report_to_str(self.crashdd_pos_report)
 
-            # Extend the global list with current crash delta diff
-            self.crashdd_pos_list.extend(self.crashdd_pos_report)
+            crashdd_outfile = self.cov_paths['delta_diff_dir'] + '/' + cbasename + '.json'
 
-            crashdd_outfile = self.cov_paths['delta_diff_dir'] + '/' + cbasename + '.dd'
+            # header = "diff crash ({}) -> parent ({})".format(cbasename, pbasename)
+            # self.write_file(header, crashdd_outfile)
+            self.dd_obtain_stats_collections(cbasename, crashdd_outfile, pbasename)
+            self.crashdd_pos_list = []
 
-            header = "diff crash ({}) -> parent ({})".format(cbasename, pbasename)
-            self.write_file(header, crashdd_outfile)
-            self.write_strlist_to_file(gp, crashdd_outfile)
-
-            ### Delete later
-            parentdd_outfile = self.cov_paths['delta_diff_dir'] + '/' + pbasename + '.dd'
-            header = "diff parent ({}) -> crash ({})".format(pbasename, cbasename)
-            self.write_file(header, parentdd_outfile)
-
-            self.parentdd_pos_report = self.prev_pos_report.difference(self.curr_pos_report)
-            self.parentdd_pos_report = sorted(self.parentdd_pos_report, key=lambda cov_entry: cov_entry[0])
-            parentgp = self.linecov_report_to_str(self.parentdd_pos_report)
-
-            self.write_strlist_to_file(parentgp, parentdd_outfile)
+            ## Legacy code
+            # gp = self.linecov_report_to_str(self.crashdd_pos_report)
+            #
+            # # Extend the global list with current crash delta diff
+            # self.crashdd_pos_list.extend(self.crashdd_pos_report)
+            #
+            # crashdd_outfile = self.cov_paths['delta_diff_dir'] + '/' + cbasename + '.dd'
+            #
+            # header = "diff crash ({}) -> parent ({})".format(cbasename, pbasename)
+            # self.write_file(header, crashdd_outfile)
+            # self.write_strlist_to_file(gp, crashdd_outfile)
+            #
+            # ### Delete later
+            # parentdd_outfile = self.cov_paths['delta_diff_dir'] + '/' + pbasename + '.dd'
+            # header = "diff parent ({}) -> crash ({})".format(pbasename, cbasename)
+            # self.write_file(header, parentdd_outfile)
+            #
+            # self.parentdd_pos_report = self.prev_pos_report.difference(self.curr_pos_report)
+            # self.parentdd_pos_report = sorted(self.parentdd_pos_report, key=lambda cov_entry: cov_entry[0])
+            # parentgp = self.linecov_report_to_str(self.parentdd_pos_report)
+            #
+            # self.write_strlist_to_file(parentgp, parentdd_outfile)
+            ## Legacy code
 
         ### Stash away all raw sancov files
         stash_dst = self.cov_paths['dd_stash_dir']
@@ -476,7 +489,7 @@ class AFLSancovReporter:
         if os.path.isfile(covered):
             os.remove(covered)
 
-        self.dd_obtain_stats()
+        # self.dd_obtain_stats()
 
         return True
 
@@ -485,7 +498,7 @@ class AFLSancovReporter:
         crash_base_fname = os.path.basename(crash_fname)
         # (bintype, session, sync, syncname, src_id)
         match = self.find_crash_parent_regex.match(crash_base_fname)
-        (bintype, _, session, __, syncname, src_id) = match.groups()
+        (_, _, _, session, __, syncname, src_id) = match.groups()
 
         if syncname:
             searchdir = syncname + '/'
