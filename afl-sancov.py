@@ -68,10 +68,10 @@ class AFLSancovReporter:
 
 
     # This regex merges legacy Is_Crash_Regex and namesake
-    old_find_crash_parent_regex = re.compile(r"^(HARDEN\-|ASAN\-)?((?P<session>[\w|\-]+):)?id:\d+,sig:\d+,"
+    find_crash_parent_regex = re.compile(r"^(HARDEN\-|ASAN\-)?((?P<session>[\w|\-]+):)?id:\d+,sig:\d+,"
                                          r"(sync:(?P<sync>[\w|\-]+),)?src:(?P<id>\d+).*$")
 
-    find_crash_parent_regex = re.compile(r"^((HARDEN:|ASAN:)\d+,)?((?P<session>[\w|\-]+):)?id:\d+,sig:\d+,"
+    new_find_crash_parent_regex = re.compile(r"^((HARDEN:|ASAN:)\d+,)?((?P<session>[\w|\-]+):)?id:\d+,sig:\d+,"
                                          r"(sync:(?P<sync>[\w|\-]+),)?src:(?P<id>\d+).*$")
 
 
@@ -498,7 +498,8 @@ class AFLSancovReporter:
         crash_base_fname = os.path.basename(crash_fname)
         # (bintype, session, sync, syncname, src_id)
         match = self.find_crash_parent_regex.match(crash_base_fname)
-        (_, _, _, session, __, syncname, src_id) = match.groups()
+#        (_, _, _, session, __, syncname, src_id) = match.groups()
+	(_, _, session, _, syncname, src_id) = match.groups()
 
         if syncname:
             searchdir = syncname + '/'
@@ -511,10 +512,16 @@ class AFLSancovReporter:
                         + " -name id:" + src_id + "*"
         parent_fname = subprocess.check_output(search_cmd, stderr=subprocess.STDOUT, shell=True)
 
-        if (len(filter(None, parent_fname.split("\n"))) != 1):
-            self.logr("Parents found: {}".format(parent_fname))
-            print "[*] Parents found: {}".format(parent_fname)
-            assert False, "Multiple or no parent matches for crash file!"
+	parent_list = filter(None, parent_fname.split("\n"))
+        if (len(parent_list) == 0):
+            self.logr("No parents found for crash file {}".format(crash_fname))
+            print "[*] No parents found for crash file {}".format(crash_fname)
+            assert False, "No parent matches for crash file!"
+
+	if (len(parent_list) > 1):
+	    self.logr("Multiple parents found for crash file {}. Selecting first.".format(crash_fname))
+	    print "[*] Multiple parents found for crash file {}. Selecting first.".format(crash_fname)
+	    return os.path.abspath(parent_list[0].rstrip("\n"))
 
         return os.path.abspath(parent_fname.rstrip("\n"))
 
