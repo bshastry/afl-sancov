@@ -377,7 +377,7 @@ class AFLSancovReporter:
             ### such parents, we try to recursively find their parent i.e., the crash file's
             ### ancestor.
             while self.parent_identical_or_crashes(crash_fname, pname):
-                self.logr("Looking up ancestors for crash file {}".format(cbasename))
+                self.logr("Looking up ancestors of crash file {}".format(cbasename))
                 pname = self.find_queue_parent(pname)
 
             pbasename = os.path.basename(pname)
