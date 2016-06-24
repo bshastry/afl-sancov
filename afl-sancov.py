@@ -29,15 +29,10 @@
 
 from shutil import rmtree
 from sys import argv
-import errno
 import re
 import glob
-import string
 from argparse import ArgumentParser
-import time
-import signal
 import sys, os
-from itertools import groupby
 import random
 import collections
 import json
@@ -81,6 +76,7 @@ class AFLSancovReporter:
     def __init__(self):
 
         self.args = self.parse_cmdline()
+        self.unique_crash_path = self.args.afl_fuzzing_dir + '/unique'
         self.cov_paths = {}
 
         ### global coverage tracking dictionary
@@ -125,9 +121,9 @@ class AFLSancovReporter:
             rv = self.process_afl_queue()
         else:
             if self.args.dd_num == 1:
-                rv = self.process_afl_crash()
+                rv = self.process_afl_crashes()
             else:
-                rv = self.process_afl_crash_deep()
+                rv = self.process_afl_crashes_deep()
 
         return not rv
 
@@ -142,6 +138,7 @@ class AFLSancovReporter:
             dict = {"crashing-input": crashfile, "parent-input": parentfile, "diff-node-spec": []}
         else:
             dict = {"crashing-input": crashfile, "diff-node-spec": []}
+
         self.deserialize_stats()
 
         counter = collections.Counter(self.crashdd_pos_list)
@@ -154,176 +151,24 @@ class AFLSancovReporter:
 
         return
 
-    def dd_obtain_stats(self, filename=None):
-
-        sorted_list = []
-        self.deserialize_stats()
-
-        if filename is None:
-            filename = self.cov_paths['dd_final_stats']
-
-        for key, group in groupby(self.crashdd_pos_list):
-            grouplist = list(group)
-            grouplen = len(grouplist)
-            sorted_list.append((grouplen, grouplist[0]))
-
-        sorted_list = sorted(sorted_list, key=lambda x: x[0], reverse=True)
-        with open(filename, 'a') as file:
-            for tpl in sorted_list:
-                print >> file, "{}, {}".format(tpl[0], tpl[1])
-
-        return
-
     def dd_write_json(self, filename, dict):
         with open(filename, "w") as file:
             json.dump(dict, file, indent=4)
 
-    def process_afl_crash_deep(self):
+    def write_result_as_json(self, cbasename, pbasename=None):
+        crashdd_outfile = self.cov_paths['delta_diff_dir'] + '/' + cbasename + '.json'
 
-        '''
-        1. Process crash file
-        2. Pick and process crash file's parent and N other randomly selected queue files
-        3. Do a repeated intersection of s.difference(t)
-        :return:
-        '''
-
-        unique_crash_path = self.args.afl_fuzzing_dir + '/unique'
-        if not os.path.isdir(unique_crash_path):
-            print "[*] There is no directory called 'unique' in --afl-fuzzing-dir"
-            return False
-
-        crash_files = self.import_unique_crashes(unique_crash_path)
-        num_crash_files = len(crash_files)
-
-        self.logr("\n*** Imported %d new crash files from: %s\n" \
-                  % (num_crash_files, (self.args.afl_fuzzing_dir + '/unique')))
-
-        if not self.import_afl_dirs():
-            return False
-
-        fuzzdirs = self.cov_paths['dirs'].keys()
-        queue_files = []
-        for val in fuzzdirs:
-            queue_files.extend(self.import_test_cases(val + '/queue'))
-
-        crash_file_counter = 0
-
-        queue_fp = []
-        queue_basename = []
-
-        for crash_fname in crash_files:
-
-            crash_file_counter += 1
-            self.logr("[+] Processing crash file ({}/{})".format(crash_file_counter, num_crash_files))
-
-            cbasename = os.path.basename(crash_fname)
-
-            ### Make sure crashing input indeed triggers a program crash
-            cov_cmd = self.args.coverage_cmd.replace('AFL_FILE', crash_fname)
-            if not self.does_dry_run_throw_error(cov_cmd):
-                self.logr("Crash input ({}) does not crash the program! Filtering crash file."
-                          .format(cbasename))
-                os.rename(crash_fname, self.cov_paths['dd_filter_dir'] + '/' + cbasename)
-                continue
-
-            self.cov_paths['crash_sancov_raw'] = self.cov_paths['delta_diff_dir'] + \
-                                                 '/' + cbasename + '.sancov'
-            self.cov_paths['crash_afl'] = cbasename
-
-            cov_cmd = self.args.coverage_cmd.replace('AFL_FILE', crash_fname)
-            ### execute the command to generate code coverage stats
-            ### for the current AFL test case file
-            sancov_env = self.get_sancov_env(self.cov_paths['crash_sancov_raw'], cbasename)
-            self.run_cmd(cov_cmd, self.No_Output, sancov_env)
-
-            globstrraw = os.path.basename("".join(glob.glob(self.cov_paths['delta_diff_dir'] + "/*.sancov.raw")))
-            globstrmap = os.path.basename("".join(glob.glob(self.cov_paths['delta_diff_dir'] + "/*.sancov.map")))
-            ### Run pysancov rawunpack before calling rename
-            self.run_cmd("cd {}; pysancov rawunpack {} ; rm {} {}".format(self.cov_paths['delta_diff_dir'],
-                                                                          globstrraw, globstrraw, globstrmap),
-                         self.No_Output)
-            # self.run_cmd("cd pysancov rawunpack " + globstrraw + " ; rm " + globstrraw + " " + globstrmap, self.No_Output)
-
-            # This renames default sancov file to specified filename
-            # and populates self.curr* report with non-crashing input's
-            # linecov info.
-            self.rename_and_extract_linecov(self.cov_paths['crash_sancov_raw'])
-
-            # Store this in self.prev_pos_report
-            self.prev_pos_report = self.curr_pos_report
-
-            queue_cnt = 0
-            while queue_cnt < self.args.dd_num:
-
-                # Select a random queue file
-                pname = random.choice(queue_files)
-                # Base names
-                pbasename = os.path.basename(pname)
-
-                ## Filter queue filenames with sig info
-                if self.find_crash_parent_regex.match(pbasename):
-                    self.logr("Parent ({}) looks like crashing input! Skipping parent.".format(pbasename))
-                    continue
-
-                ### AFL corpus sometimes contains parent file that is identical to crash file
-                ### Skip them for the moment.
-                try:
-                    diff_out = subprocess.check_output("diff -q {} {}".format(crash_fname, pname),
-                                                       stderr=subprocess.STDOUT, shell=True)
-                except Exception, e:
-                    diff_out = e.output
-
-                if not diff_out.rstrip("\n"):
-                    self.logr("Crash file ({}) and parent ({}) are identical! Skipping parent."
-                              .format(cbasename, pbasename))
-                    continue
-
-                cov_cmd = self.args.coverage_cmd.replace('AFL_FILE', pname)
-
-                ### Dry-run to make sure parent doesn't cause a crash
-                if self.does_dry_run_throw_error(cov_cmd):
-                    self.logr("Parent ({}) crashes binary! Skipping parent..".format(pbasename))
-                    continue
-
-                #### The output should be written to delta-diff dir
-                #### as afl_input namesake witha sancov extension
-                ### raw sancov file
-                self.cov_paths['parent_sancov_raw'] = self.cov_paths['delta_diff_dir'] + \
-                                                      '/' + pbasename + '.sancov'
-                self.cov_paths['parent_afl'] = pbasename
-
-                ### execute the command to generate code coverage stats
-                ### for the current AFL test case file
-                sancov_env = self.get_sancov_env(self.cov_paths['parent_sancov_raw'], pbasename)
-                self.run_cmd(cov_cmd, self.No_Output, sancov_env)
-
-                # This renames default sancov file to specified filename
-                # and populates self.curr* report with non-crashing input's
-                # linecov info.
-                # We bail if for some reason cov info couldn't be generated
-                # This happens with some queue files. I don't know why.
-                if not self.rename_and_extract_linecov(self.cov_paths['parent_sancov_raw']):
-                    continue
-
-                # Increment queue_cnt
-                queue_cnt += 1
-                self.logr("Processing parent {}/{}".format(queue_cnt, self.args.dd_num))
-
-                # Obtain Pc.difference(Pnc) and write to file
-                self.crashdd_pos_report = self.prev_pos_report.difference(self.curr_pos_report)
-                self.crashdd_pos_report = sorted(self.crashdd_pos_report, \
-                                                 key=lambda cov_entry: (cov_entry[0], cov_entry[2], cov_entry[3]))
-
-                # Extend the global list with current crash delta diff
-                self.crashdd_pos_list.extend(self.crashdd_pos_report)
-
-            crashdd_outfile = self.cov_paths['delta_diff_dir'] + '/' + cbasename + '.json'
-
-            # header = "diff crash ({}) -> parent ({})".format(cbasename, pbasename)
-            # self.write_file(header, crashdd_outfile)
+        # header = "diff crash ({}) -> parent ({})".format(cbasename, pbasename)
+        # self.write_file(header, crashdd_outfile)
+        if pbasename:
+            self.dd_obtain_stats_collections(cbasename, crashdd_outfile, pbasename)
+        else:
             self.dd_obtain_stats_collections(cbasename, crashdd_outfile)
-            self.crashdd_pos_list = []
 
+        ## Reset state to be safe
+        self.crashdd_pos_list = []
+
+    def cleanup(self):
         ### Stash away all raw sancov files
         stash_dst = self.cov_paths['dd_stash_dir']
         if os.path.isdir(stash_dst):
@@ -335,13 +180,16 @@ class AFLSancovReporter:
         if os.path.isfile(covered):
             os.remove(covered)
 
-        return True
-
     def parent_identical_or_crashes(self, crash, parent):
 
         # Base names
         cbasename = os.path.basename(crash)
         pbasename = os.path.basename(parent)
+
+        ## Filter queue filenames with sig info
+        if self.find_crash_parent_regex.match(pbasename):
+            self.logr("Parent ({}) looks like crashing input!".format(pbasename))
+            return True
 
         try:
             diff_out = subprocess.check_output("diff -q {} {}".format(crash, parent),
@@ -363,7 +211,142 @@ class AFLSancovReporter:
 
         return False
 
-    def process_afl_crash(self):
+    def generate_cov_for_parent(self, parent_fname):
+        pbasename = os.path.basename(parent_fname)
+
+        #### The output should be written to delta-diff dir
+        #### as afl_input namesake witha sancov extension
+        ### raw sancov file
+        self.cov_paths['parent_sancov_raw'] = self.cov_paths['delta_diff_dir'] + \
+                                              '/' + pbasename + '.sancov'
+        self.cov_paths['parent_afl'] = pbasename
+
+        cov_cmd = self.args.coverage_cmd.replace('AFL_FILE', parent_fname)
+        ### execute the command to generate code coverage stats
+        ### for the current AFL test case file
+        sancov_env = self.get_sancov_env(self.cov_paths['parent_sancov_raw'], pbasename)
+        self.run_cmd(cov_cmd, self.No_Output, sancov_env)
+
+        # This renames default sancov file to specified filename
+        # and populates self.curr* report with non-crashing input's
+        # linecov info.
+        if not self.rename_and_extract_linecov(self.cov_paths['parent_sancov_raw']):
+            self.logr("Error generating cov info for parent {}".format(pbasename))
+            return False
+
+        return True
+
+    def generate_cov_for_crash(self, crash_fname):
+
+        cbasename = os.path.basename(crash_fname)
+
+        self.cov_paths['crash_sancov_raw'] = self.cov_paths['delta_diff_dir'] + \
+                                             '/' + cbasename + '.sancov'
+
+        self.cov_paths['crash_afl'] = cbasename
+
+        ### Make sure crashing input indeed triggers a program crash
+        cov_cmd = self.args.coverage_cmd.replace('AFL_FILE', crash_fname)
+        if not self.does_dry_run_throw_error(cov_cmd):
+            self.logr("Crash input ({}) does not crash the program! Filtering crash file."
+                      .format(cbasename))
+            os.rename(crash_fname, self.cov_paths['dd_filter_dir'] + '/' + cbasename)
+            return False
+
+        ### execute the command to generate code coverage stats
+        ### for the current AFL test case file
+        sancov_env = self.get_sancov_env(self.cov_paths['crash_sancov_raw'], cbasename)
+        self.run_cmd(cov_cmd, self.No_Output, sancov_env)
+
+        globstrraw = os.path.basename("".join(glob.glob(self.cov_paths['delta_diff_dir'] + "/*.sancov.raw")))
+        globstrmap = os.path.basename("".join(glob.glob(self.cov_paths['delta_diff_dir'] + "/*.sancov.map")))
+        ### Run pysancov rawunpack before calling rename
+        self.run_cmd("cd {}; pysancov rawunpack {} ; rm {} {}".format(self.cov_paths['delta_diff_dir'],
+                                                                      globstrraw, globstrraw, globstrmap),
+                     self.No_Output)
+        # self.run_cmd("cd pysancov rawunpack " + globstrraw + " ; rm " + globstrraw + " " + globstrmap, self.No_Output)
+
+        # This renames default sancov file to specified filename
+        # and populates self.curr* report with non-crashing input's
+        # linecov info.
+        if not self.rename_and_extract_linecov(self.cov_paths['crash_sancov_raw']):
+            self.logr("Error generating coverage info for crash file {}".format(cbasename))
+            return False
+
+        return True
+
+    def process_afl_crashes_deep(self):
+
+        '''
+        1. Process crash file
+        2. Pick and process crash file's parent and N other randomly selected queue files
+        3. Do a repeated intersection of s.difference(t)
+        :return:
+        '''
+
+        crash_files = self.import_unique_crashes(self.unique_crash_path)
+        num_crash_files = len(crash_files)
+
+        self.logr("\n*** Imported %d new crash files from: %s\n" \
+                  % (num_crash_files, (self.args.afl_fuzzing_dir + '/unique')))
+
+        if not self.import_afl_dirs():
+            return False
+
+        fuzzdirs = self.cov_paths['dirs'].keys()
+        queue_files = []
+        for val in fuzzdirs:
+            queue_files.extend(self.import_test_cases(val + '/queue'))
+
+        crash_file_counter = 0
+
+        for crash_fname in crash_files:
+
+            crash_file_counter += 1
+            self.logr("[+] Processing crash file ({}/{})".format(crash_file_counter, num_crash_files))
+
+            cbasename = os.path.basename(crash_fname)
+
+            if not self.generate_cov_for_crash(crash_fname):
+                continue
+
+            # Store this in self.prev_pos_report
+            self.prev_pos_report = self.curr_pos_report
+
+            queue_cnt = 0
+            while queue_cnt < self.args.dd_num:
+
+                # Select a random queue file
+                pname = random.choice(queue_files)
+                # Base names
+                pbasename = os.path.basename(pname)
+
+                if self.parent_identical_or_crashes(crash_fname, pname):
+                    self.logr("Skipping parent of crash file {}".format(cbasename))
+                    continue
+
+                if not self.generate_cov_for_parent(pname):
+                    self.logr("Error generating cov info for parent of {}".format(cbasename))
+                    continue
+
+                # Increment queue_cnt
+                queue_cnt += 1
+                self.logr("Processing parent {}/{}".format(queue_cnt, self.args.dd_num))
+
+                # Obtain Pc.difference(Pnc) and write to file
+                self.crashdd_pos_report = self.prev_pos_report.difference(self.curr_pos_report)
+                self.crashdd_pos_report = sorted(self.crashdd_pos_report, \
+                                                 key=lambda cov_entry: (cov_entry[0], cov_entry[2], cov_entry[3]))
+
+                # Extend the global list with current crash delta diff
+                self.crashdd_pos_list.extend(self.crashdd_pos_report)
+
+            self.write_result_as_json(cbasename)
+
+        self.cleanup()
+        return True
+
+    def process_afl_crashes(self):
 
         '''
         1. Process crash file
@@ -372,12 +355,7 @@ class AFLSancovReporter:
         :return:
         '''
 
-        unique_crash_path = self.args.afl_fuzzing_dir + '/unique'
-        if not os.path.isdir(unique_crash_path):
-            print "[*] There is no directory called 'unique' in --afl-fuzzing-dir"
-            return False
-
-        crash_files = self.import_unique_crashes(unique_crash_path)
+        crash_files = self.import_unique_crashes(self.unique_crash_path)
         num_crash_files = len(crash_files)
 
         self.logr("\n*** Imported %d new crash files from: %s\n" \
@@ -404,56 +382,15 @@ class AFLSancovReporter:
 
             pbasename = os.path.basename(pname)
 
-            #### The output should be written to delta-diff dir
-            #### as afl_input namesake witha sancov extension
-            ### raw sancov file
-            self.cov_paths['parent_sancov_raw'] = self.cov_paths['delta_diff_dir'] + \
-                                                  '/' + pbasename + '.sancov'
-            self.cov_paths['parent_afl'] = pbasename
-
-            cov_cmd = self.args.coverage_cmd.replace('AFL_FILE', pname)
-            ### execute the command to generate code coverage stats
-            ### for the current AFL test case file
-            sancov_env = self.get_sancov_env(self.cov_paths['parent_sancov_raw'], pbasename)
-            self.run_cmd(cov_cmd, self.No_Output, sancov_env)
-
-            # This renames default sancov file to specified filename
-            # and populates self.curr* report with non-crashing input's
-            # linecov info.
-            self.rename_and_extract_linecov(self.cov_paths['parent_sancov_raw'])
+            if not self.generate_cov_for_parent(pname):
+                self.logr("Error generating cov info for parent of {}".format(cbasename))
+                continue
 
             self.prev_pos_report = self.curr_pos_report
             self.prev_zero_report = self.curr_zero_report
 
-            self.cov_paths['crash_sancov_raw'] = self.cov_paths['delta_diff_dir'] + \
-                                                 '/' + cbasename + '.sancov'
-            self.cov_paths['crash_afl'] = cbasename
-
-            ### Make sure crashing input indeed triggers a program crash
-            cov_cmd = self.args.coverage_cmd.replace('AFL_FILE', crash_fname)
-            if not self.does_dry_run_throw_error(cov_cmd):
-                self.logr("Crash input ({}) does not crash the program! Filtering crash file."
-                          .format(cbasename))
-                os.rename(crash_fname, self.cov_paths['dd_filter_dir'] + '/' + cbasename)
+            if not self.generate_cov_for_crash(crash_fname):
                 continue
-
-            ### execute the command to generate code coverage stats
-            ### for the current AFL test case file
-            sancov_env = self.get_sancov_env(self.cov_paths['crash_sancov_raw'], cbasename)
-            self.run_cmd(cov_cmd, self.No_Output, sancov_env)
-
-            globstrraw = os.path.basename("".join(glob.glob(self.cov_paths['delta_diff_dir'] + "/*.sancov.raw")))
-            globstrmap = os.path.basename("".join(glob.glob(self.cov_paths['delta_diff_dir'] + "/*.sancov.map")))
-            ### Run pysancov rawunpack before calling rename
-            self.run_cmd("cd {}; pysancov rawunpack {} ; rm {} {}".format(self.cov_paths['delta_diff_dir'],
-                                                                          globstrraw, globstrraw, globstrmap),
-                         self.No_Output)
-            # self.run_cmd("cd pysancov rawunpack " + globstrraw + " ; rm " + globstrraw + " " + globstrmap, self.No_Output)
-
-            # This renames default sancov file to specified filename
-            # and populates self.curr* report with non-crashing input's
-            # linecov info.
-            self.rename_and_extract_linecov(self.cov_paths['crash_sancov_raw'])
 
             # Obtain Pc.difference(Pnc) and write to file
             self.crashdd_pos_report = self.curr_pos_report.difference(self.prev_pos_report)
@@ -461,12 +398,7 @@ class AFLSancovReporter:
             self.crashdd_pos_list = sorted(self.crashdd_pos_report, \
                                            key=lambda cov_entry: (cov_entry[0], cov_entry[2], cov_entry[3]))
 
-            crashdd_outfile = self.cov_paths['delta_diff_dir'] + '/' + cbasename + '.json'
-
-            # header = "diff crash ({}) -> parent ({})".format(cbasename, pbasename)
-            # self.write_file(header, crashdd_outfile)
-            self.dd_obtain_stats_collections(cbasename, crashdd_outfile, pbasename)
-            self.crashdd_pos_list = []
+            self.write_result_as_json(cbasename, pbasename)
 
             ## Legacy code
             # gp = self.linecov_report_to_str(self.crashdd_pos_report)
@@ -492,19 +424,8 @@ class AFLSancovReporter:
             # self.write_strlist_to_file(parentgp, parentdd_outfile)
             ## Legacy code
 
-        ### Stash away all raw sancov files
-        stash_dst = self.cov_paths['dd_stash_dir']
-        if os.path.isdir(stash_dst):
-            for file in sorted(glob.glob(self.cov_paths['delta_diff_dir'] + '/*.sancov')):
-                os.rename(file, stash_dst + '/' + os.path.basename(file))
-
-        # Remove covered.txt
-        covered = self.cov_paths['delta_diff_dir'] + '/covered.txt'
-        if os.path.isfile(covered):
-            os.remove(covered)
-
         # self.dd_obtain_stats()
-
+        self.cleanup()
         return True
 
     def get_parent(self, filepath, isCrash=True):
@@ -971,6 +892,8 @@ class AFLSancovReporter:
         # self.write_file("\n".join(out_lines), cp['pos_line_cov'])
         # In-memory representation
         self.curr_pos_report = self.linecov_report("\n".join(out_lines))
+        if not self.curr_pos_report:
+            return False
 
         # Zero line coverage
         # pysancov print cp['sancov_raw'] > covered.txt
@@ -1184,6 +1107,11 @@ class AFLSancovReporter:
 
         if not self.args.afl_fuzzing_dir:
             print "[*] --afl-fuzzing-dir missing"
+            return False
+
+        # TODO: Hard-coded path in __init__. Move to cmdline arg.
+        if not os.path.isdir(self.unique_crash_path):
+            print "[*] There is no directory called 'unique' in --afl-fuzzing-dir"
             return False
 
         if not self.args.bin_path:
