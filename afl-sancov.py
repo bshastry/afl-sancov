@@ -314,16 +314,31 @@ class AFLSancovReporter:
             self.prev_pos_report = self.curr_pos_report
 
             queue_cnt = 0
+            # Find parent
+            pname = self.find_parent_crashing(crash_fname)
+
             while queue_cnt < self.args.dd_num:
 
-                # Select a random queue file
-                pname = random.choice(queue_files)
-                # Base names
-                pbasename = os.path.basename(pname)
+                if queue_cnt > 0:
+                    pname = self.find_queue_parent(pname)
+                    if not pname:
+                        self.logr("Cannot find ancestors of crash file {}. Bailing out".format(cbasename))
+                        break
 
-                if self.parent_identical_or_crashes(crash_fname, pname):
-                    self.logr("Skipping parent of crash file {}".format(cbasename))
-                    continue
+                while pname and self.parent_identical_or_crashes(crash_fname, pname):
+                    self.logr("Looking up ancestors of crash file {}".format(cbasename))
+                    pname = self.find_queue_parent(pname)
+
+                if not pname:
+                    self.logr("Cannot find ancestors of crash file {}. Bailing out".format(cbasename))
+                    break
+
+                # Select a random queue file
+                # pname = random.choice(queue_files)
+
+                # if self.parent_identical_or_crashes(crash_fname, pname):
+                #     self.logr("Skipping parent of crash file {}".format(cbasename))
+                #     continue
 
                 if not self.generate_cov_for_parent(pname):
                     self.logr("Error generating cov info for parent of {}".format(cbasename))
@@ -447,12 +462,16 @@ class AFLSancovReporter:
 
         else:
             match = self.find_queue_parent_regex.match(basename)
+            if not match:
+                self.logr("No parent could be found for {}".format(basename))
+                return None
+
             (_, syncname, src_id) = match.groups()
 
             searchdir = dirname
 
-            # if syncname:
-            #     searchdir += '/../../' + syncname + '/queue'
+            if syncname:
+                searchdir += '/../../' + syncname + '/queue'
 
 
         search_cmd = "find " + searchdir + " -maxdepth 1" + " -name id:" + src_id + "*"
@@ -462,7 +481,7 @@ class AFLSancovReporter:
         parent_list = filter(None, parent_fname.split("\n"))
         if (len(parent_list) == 0):
             self.logr("No parents found for file {}".format(basename))
-            assert False, "No parent matches for file!"
+            return None
 
         if (len(parent_list) > 1):
             self.logr("Multiple parents found for file {}. Selecting first.".format(basename))
