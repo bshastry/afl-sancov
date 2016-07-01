@@ -76,7 +76,7 @@ class AFLSancovReporter:
     def __init__(self):
 
         self.args = self.parse_cmdline()
-        self.unique_crash_path = self.args.afl_fuzzing_dir + '/unique'
+
         self.cov_paths = {}
 
         ### global coverage tracking dictionary
@@ -1128,7 +1128,9 @@ class AFLSancovReporter:
             print "[*] --afl-fuzzing-dir missing"
             return False
 
-        # TODO: Hard-coded path in __init__. Move to cmdline arg.
+        # TODO: Hard-coded path. Move to cmdline arg.
+        self.unique_crash_path = self.args.afl_fuzzing_dir + '/unique'
+
         if not os.path.isdir(self.unique_crash_path):
             print "[*] There is no directory called 'unique' in --afl-fuzzing-dir"
             return False
