@@ -229,16 +229,17 @@ class AFLSancovReporter:
                                               '/' + pbasename + '.sancov'
         self.cov_paths['parent_afl'] = pbasename
 
-        if self.args.sancov_bug:
-            cov_cmd = 'cd {}; '.format(self.cov_paths['delta_diff_dir'])
-        else:
-            cov_cmd = ''
-
-        cov_cmd += self.args.coverage_cmd.replace('AFL_FILE', parent_fname)
+        cov_cmd = self.args.coverage_cmd.replace('AFL_FILE', parent_fname)
         ### execute the command to generate code coverage stats
         ### for the current AFL test case file
         sancov_env = self.get_sancov_env(self.cov_paths['parent_sancov_raw'], pbasename)
+
         self.run_cmd(cov_cmd, self.No_Output, sancov_env)
+
+        if self.args.sancov_bug:
+            sancovfile = "".join(glob.glob("*.sancov"))
+            cov_cmd = 'mv {} {}'.format(sancovfile, self.cov_paths['delta_diff_dir'])
+            self.run_cmd(cov_cmd, self.No_Output)
 
         # This renames default sancov file to specified filename
         # and populates self.curr* report with non-crashing input's
@@ -258,13 +259,8 @@ class AFLSancovReporter:
 
         self.cov_paths['crash_afl'] = cbasename
 
-        if self.args.sancov_bug:
-            cov_cmd = 'cd {}; '.format(self.cov_paths['delta_diff_dir'])
-        else:
-            cov_cmd = ''
-
         ### Make sure crashing input indeed triggers a program crash
-        cov_cmd += self.args.coverage_cmd.replace('AFL_FILE', crash_fname)
+        cov_cmd = self.args.coverage_cmd.replace('AFL_FILE', crash_fname)
         if not self.does_dry_run_throw_error(cov_cmd):
             self.logr("Crash input ({}) does not crash the program! Filtering crash file."
                       .format(cbasename))
@@ -274,7 +270,16 @@ class AFLSancovReporter:
         ### execute the command to generate code coverage stats
         ### for the current AFL test case file
         sancov_env = self.get_sancov_env(self.cov_paths['crash_sancov_raw'], cbasename)
+
         self.run_cmd(cov_cmd, self.No_Output, sancov_env)
+
+        if self.args.sancov_bug:
+            rawfilename = "".join(glob.glob("*.sancov.raw"))
+            mapfilename = "".join(glob.glob("*.sancov.map"))
+
+            cov_cmd = 'mv {} {} {}'.format(rawfilename, mapfilename,
+                                            self.cov_paths['delta_diff_dir'])
+            self.run_cmd(cov_cmd, self.No_Output)
 
         globstrraw = os.path.basename("".join(glob.glob(self.cov_paths['delta_diff_dir'] + "/*.sancov.raw")))
         globstrmap = os.path.basename("".join(glob.glob(self.cov_paths['delta_diff_dir'] + "/*.sancov.map")))
