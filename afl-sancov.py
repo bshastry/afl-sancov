@@ -229,7 +229,12 @@ class AFLSancovReporter:
                                               '/' + pbasename + '.sancov'
         self.cov_paths['parent_afl'] = pbasename
 
-        cov_cmd = self.args.coverage_cmd.replace('AFL_FILE', parent_fname)
+        if self.args.sancov_bug:
+            cov_cmd = 'cd {}; '.format(self.cov_paths['delta_diff_dir'])
+        else:
+            cov_cmd = ''
+
+        cov_cmd += self.args.coverage_cmd.replace('AFL_FILE', parent_fname)
         ### execute the command to generate code coverage stats
         ### for the current AFL test case file
         sancov_env = self.get_sancov_env(self.cov_paths['parent_sancov_raw'], pbasename)
@@ -259,8 +264,13 @@ class AFLSancovReporter:
 
         self.cov_paths['crash_afl'] = cbasename
 
+        if self.args.sancov_bug:
+            cov_cmd = 'cd {}; '.format(self.cov_paths['delta_diff_dir'])
+        else:
+            cov_cmd = ''
+
         ### Make sure crashing input indeed triggers a program crash
-        cov_cmd = self.args.coverage_cmd.replace('AFL_FILE', crash_fname)
+        cov_cmd += self.args.coverage_cmd.replace('AFL_FILE', crash_fname)
         if not self.does_dry_run_throw_error(cov_cmd):
             self.logr("Crash input ({}) does not crash the program! Filtering crash file."
                       .format(cbasename))
