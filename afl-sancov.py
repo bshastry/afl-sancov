@@ -229,7 +229,12 @@ class AFLSancovReporter:
                                               '/' + pbasename + '.sancov'
         self.cov_paths['parent_afl'] = pbasename
 
-        cov_cmd = self.args.coverage_cmd.replace('AFL_FILE', parent_fname)
+        if self.args.sancov_bug:
+            cov_cmd = 'cd {}; '.format(self.cov_paths['delta_diff_dir'])
+        else:
+            cov_cmd = ''
+
+        cov_cmd += self.args.coverage_cmd.replace('AFL_FILE', parent_fname)
         ### execute the command to generate code coverage stats
         ### for the current AFL test case file
         sancov_env = self.get_sancov_env(self.cov_paths['parent_sancov_raw'], pbasename)
@@ -253,8 +258,13 @@ class AFLSancovReporter:
 
         self.cov_paths['crash_afl'] = cbasename
 
+        if self.args.sancov_bug:
+            cov_cmd = 'cd {}; '.format(self.cov_paths['delta_diff_dir'])
+        else:
+            cov_cmd = ''
+
         ### Make sure crashing input indeed triggers a program crash
-        cov_cmd = self.args.coverage_cmd.replace('AFL_FILE', crash_fname)
+        cov_cmd += self.args.coverage_cmd.replace('AFL_FILE', crash_fname)
         if not self.does_dry_run_throw_error(cov_cmd):
             self.logr("Crash input ({}) does not crash the program! Filtering crash file."
                       .format(cbasename))
@@ -818,16 +828,28 @@ class AFLSancovReporter:
         sancov_env = os.environ.copy()
         if self.args.sanitizer == "asan":
             if self.find_crash_parent_regex.match(afl_input):
-                sancov_env['ASAN_OPTIONS'] = 'coverage=1:coverage_direct=1:' \
+                if not self.args.sancov_bug:
+                    sancov_env['ASAN_OPTIONS'] = 'coverage=1:coverage_direct=1:' \
                                              'coverage_dir=%s' % fpath
+                else:
+                    sancov_env['ASAN_OPTIONS'] = 'coverage=1:coverage_direct=1'
             else:
-                sancov_env['ASAN_OPTIONS'] = 'coverage=1:coverage_dir=%s' % fpath
+                if not self.args.sancov_bug:
+                    sancov_env['ASAN_OPTIONS'] = 'coverage=1:coverage_dir=%s' % fpath
+                else:
+                    sancov_env['ASAN_OPTIONS'] = 'coverage=1'
         else:
             if self.find_crash_parent_regex.match(afl_input):
-                sancov_env['UBSAN_OPTIONS'] = 'coverage=1:coverage_direct=1:' \
+                if not self.args.sancov_bug:
+                    sancov_env['UBSAN_OPTIONS'] = 'coverage=1:coverage_direct=1:' \
                                               'coverage_dir=%s' % fpath
+                else:
+                    sancov_env['UBSAN_OPTIONS'] = 'coverage=1:coverage_direct=1'
             else:
-                sancov_env['UBSAN_OPTIONS'] = 'coverage=1:coverage_dir=%s' % fpath
+                if not self.args.sancov_bug:
+                    sancov_env['UBSAN_OPTIONS'] = 'coverage=1:coverage_dir=%s' % fpath
+                else:
+                    sancov_env['UBSAN_OPTIONS'] = 'coverage=1'
 
         return sancov_env
 
@@ -980,7 +1002,7 @@ class AFLSancovReporter:
                 assert False, "sancov file is a directory!"
 
         # assert False, "sancov file {} not found!".format(newname)
-        self.logr("Could not generate coverage info for parent {}. Bailing out!".format(newname))
+        self.logr("Could not find coverage file. Bailing out!")
         return False
 
     @staticmethod
@@ -1117,6 +1139,8 @@ class AFLSancovReporter:
                        help="Experimental! Perform more compute intensive analysis of crashing input by comparing its"
                             "path profile with aggregated path profiles of N=dd-num randomly selected non-crashing inputs",
                        default=1)
+        p.add_argument("--sancov-bug", action='store_true',
+                       help="Sancov bug that occurs for certain coverage_dir env vars", default=False)
         # p.add_argument("--dd-raw-queue-path", type=str,
         #         help="Path to raw queue files (used in --dd-mode)")
         # p.add_argument("--dd-crash-file", type=str,
