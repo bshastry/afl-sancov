@@ -147,6 +147,14 @@ class AFLSancovReporter:
         for tpl in sorted_list:
             dict['diff-node-spec'].append({'line': tpl[0], 'count': tpl[1]})
 
+        # self.prev_pos_report contains crash file's exec slice
+        slice_linecount = len(self.prev_pos_report)
+        dice_linecount = len(sorted_list)
+
+        dict['slice-linecount'] = slice_linecount
+        dict['dice-linecount'] = dice_linecount
+        dict['shrink-percent'] = (dice_linecount/slice_linecount)*100
+
         self.dd_write_json(jsonfilename, dict)
 
         return
