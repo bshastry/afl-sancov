@@ -153,7 +153,7 @@ class AFLSancovReporter:
 
         dict['slice-linecount'] = slice_linecount
         dict['dice-linecount'] = dice_linecount
-        dict['shrink-percent'] = (dice_linecount/slice_linecount)*100
+        dict['shrink-percent'] = (float(dice_linecount)/slice_linecount)*100
 
         self.dd_write_json(jsonfilename, dict)
 
