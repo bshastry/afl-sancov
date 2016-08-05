@@ -64,13 +64,13 @@ class AFLSancovReporter:
 
 
     # This regex merges legacy Is_Crash_Regex and namesake
-    find_crash_parent_regex = re.compile(r"^(HARDEN\-|ASAN\-)?((?P<session>[\w|\-]+):)?id:\d+,sig:\d+,"
-                                         r"(sync:(?P<sync>[\w|\-]+),)?src:(?P<id>\d+).*$")
+    # old_find_crash_parent_regex = re.compile(r"^(HARDEN\-|ASAN\-)?((?P<session>[\w|\-]+):)?id:\d+,sig:\d+,"
+    #                                      r"(sync:(?P<sync>[\w|\-]+),)?src:(?P<id>\d+).*$")
     find_queue_parent_regex = re.compile(r"id:\d+,(sync:(?P<sync>[\w|\-]+),)?src:(?P<id>\d+).*$")
 
     # For proposed successor of current naming convention
-    # new_find_crash_parent_regex = re.compile(r"^((HARDEN:|ASAN:)\d+,)?((?P<session>[\w|\-]+):)?id:\d+,sig:\d+,"
-    #                                      r"(sync:(?P<sync>[\w|\-]+),)?src:(?P<id>\d+).*$")
+    find_crash_parent_regex = re.compile(r"^((HARDEN:|ASAN:)\d+,)?((?P<session>[\w|\-]+):)?id:\d+,sig:\d+,"
+                                         r"(sync:(?P<sync>[\w|\-]+),)?src:(?P<id>\d+).*$")
 
 
     def __init__(self):
@@ -449,7 +449,8 @@ class AFLSancovReporter:
 
         if isCrash:
             match = self.find_crash_parent_regex.match(basename)
-            (_, _, session, _, syncname, src_id) = match.groups()
+            # (_, _, session, _, syncname, src_id) = match.groups()
+            (_, _, _, session, _, syncname, src_id) = match.groups()
 
             searchdir = self.args.afl_fuzzing_dir
             # if syncname:
