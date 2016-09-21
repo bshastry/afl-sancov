@@ -1,3 +1,5 @@
+# afl-sancov [![Build Status](https://travis-ci.org/bshastry/afl-sancov.svg?branch=master)](https://travis-ci.org/bshastry/afl-sancov)
+
 ### Whatis?
 
 afl-sancov is a fork of [afl-cov][1] (version 0.5) that works on Clang/LLVM sanitizer instrumented binaries.
