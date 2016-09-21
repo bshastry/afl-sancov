@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 CODE_DIR=.
-AFL_COV=./aflsancov.py
+AFL_COV=../afl-sancov.py
 AFL_TEST_CASES=./afl-out
 
 # A stub for invoking sancov during tests
