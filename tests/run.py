@@ -30,8 +30,8 @@ def main():
     ### system commands that we require
     cmds = {
 #        'git':'',
-        'pysancov':'',
-        'sancov':'',
+#        'pysancov':'',
+#        'sancov':'',
         'python':'',
     }
 
