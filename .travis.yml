@@ -16,6 +16,5 @@ language: python
 python:
         - 2.7
 
-env:
-        - COMPILER=clang-3.8
-script: cd tests && python run.py
+install: ./install_deps.sh
+script: wget cd tests && python run.py
