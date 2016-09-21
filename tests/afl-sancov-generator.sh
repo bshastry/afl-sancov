@@ -7,7 +7,7 @@ AFL_TEST_CASES=./afl-out
 # A stub for invoking sancov during tests
 echo -e "\t[+] Generating coverage information for test-sancov.c"
 rm -f test-sancov
-clang -O0 -g -fsanitize=undefined -fsanitize-coverage=edge \
+clang-3.8 -O0 -g -fsanitize=undefined -fsanitize-coverage=edge \
        	test-sancov.c -o test-sancov
 
 echo "[+] Invoking afl-sancov"
