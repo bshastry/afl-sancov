@@ -110,6 +110,7 @@ class TestAflSanCov(unittest.TestCase):
                         % (self.single_generator))
         out_str = ''.join(self.do_cmd("%s --afl-queue-id-limit 1" \
                         % (self.single_generator)))
+        print out_str
         self.assertTrue("use --overwrite" in out_str,
                 "Missing --overwrite not caught")
 
