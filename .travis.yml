@@ -5,7 +5,8 @@ dist: trusty
 addons:
         apt:
                 sources:
-                        - llvm-toolchain-trusty-3.8
+                        - sourceline: 'deb http://apt.llvm.org/trusty/ llvm-toolchain-trusty-3.8 main'
+                          key_url: 'http://apt.llvm.org/llvm-snapshot.gpg.key'
                 packages:
                         - clang-3.8
                         - libclang-common-3.8-dev
