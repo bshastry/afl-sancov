@@ -69,10 +69,10 @@ def main():
 
     ### run the actual tests
     print "[+] Running afl-sancov tests (ignore 'Terminated' messages)..."
-    subprocess.call("%s %s" % (cmds['python'], test_cmd),
+    rv = subprocess.call("%s %s" % (cmds['python'], test_cmd),
             stdin=None, shell=True)
 
-    return
+    return rv
 
 # def build_fwknop(cdir, commit, compile_cmd, cmds, cargs):
 #
