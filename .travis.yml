@@ -17,4 +17,4 @@ python:
 
 env:
         - COMPILER=clang-3.8
-script: python tests/run.py
+script: cd tests && python run.py
