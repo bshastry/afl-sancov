@@ -17,4 +17,4 @@ python:
         - 2.7
 
 install: ./install_deps.sh
-script: wget cd tests && python run.py
+script: cd tests && python run.py
