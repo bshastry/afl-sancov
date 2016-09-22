@@ -1007,7 +1007,7 @@ class AFLSancovReporter:
                 assert False, "sancov file is a directory!"
 
         # assert False, "sancov file {} not found!".format(newname)
-        self.logr("Could not find coverage file. Bailing out!")
+        self.logr("Could not generate coverage info for parent {}. Bailing out!".format(newname))
         return False
 
     @staticmethod
