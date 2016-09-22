@@ -58,6 +58,10 @@ The structure is similar to `afl-cov`
 
 I am happy to take both. If there is demand, I can work on polishing the `delta-diff` feature
 
+### Credits
+
+Of course, a large part of `afl-sancov` development and testing has been possible due to Michael Rash's excellent tool and the open-source fuzzing community at afl-users and beyond. So, thank you all :-)
+
 ### Full usage
 
 ```bash
@@ -116,5 +120,3 @@ optional arguments:
 
 [1]: https://github.com/mrash/afl-cov    
 [2]: www.argreenhouse.com/papers/hira/issre95.pdf
-
-
