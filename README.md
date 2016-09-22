@@ -120,4 +120,4 @@ optional arguments:
 
 
 [1]: https://github.com/mrash/afl-cov    
-[2]: www.argreenhouse.com/papers/hira/issre95.pdf
+[2]: http://www.argreenhouse.com/papers/hira/issre95.pdf
