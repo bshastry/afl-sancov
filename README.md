@@ -50,6 +50,7 @@ The structure is similar to `afl-cov`
 - afl-sync-dir
   - sancov (Root dir for coverage info)
     - delta-diff (Dir for differential spectrum)
+      - Bunch of json files summarizing delta coverage between crashing and queue inputs
     - cons-cov (Consolidated overage a la `afl-cov`)
     - diff (Inter-queue-input differential coverage a la `afl-cov`)
     - ... and so on a la `afl-cov`
