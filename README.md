@@ -105,7 +105,7 @@ int main(int argc, char* argv[]) {
 }
 ```
 
-then, you should get output like so (in afl-sync-dir/sancov/delta-diff/<crash_filename>.json) 
+then, you should get output like so (in afl-sync-dir/sancov/delta-diff/`crash_filename`.json) 
 
 
 ```json
