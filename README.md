@@ -68,7 +68,7 @@ I am happy to take both. If there is demand, I can work on polishing the `delta-
 
 Of course, a large part of `afl-sancov` development and testing has been possible due to Michael Rash's excellent tool and the open-source fuzzing community at afl-users and beyond. So, thank you all :-)
 
-### Sample workflow
+### Example
 
 Suppose you have afl corpus after fuzzing the following test harness:
 
@@ -97,7 +97,7 @@ int main(int argc, char* argv[]) {
 
 	/* Parse it in some vulnerable way. You'd normally call a library here. */
 	if (!strcmp(buf, "pwn"))
-		bug();
+		bug();		// <- line 25
 	else
 		puts("works!");
 
