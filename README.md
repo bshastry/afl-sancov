@@ -22,6 +22,11 @@ $ sudo apt-get --no-install-suggests --no-install-recommends --force-yes install
 
 - Run `./install_deps.sh` for installing sanitizer coverage python script not distributed in ubuntu package (requires sudo)
 - Requires test binary to be compiled with either `-fsanitize=address -fsanitize-coverage=<your_preference>` or `-fsanitize=undefined -fsanitize-coverage=<your_preference>` (you tell afl-sancov if its ASAN or UBSAN by passing `--sanitizer asan`, defaults to ubsan if flag not present in command line)
+- Run afl-collect and collect all (or post triage) crashes to a directory called `unique` located under /path/to/afl/sync/dir, like so:
+```bash
+$ afl-collect -r afl-out afl-out/unique -- test_harness -i @@ -o /dev/null
+```
+Bear in mind that this directory name is presently hard coded to `unique`.
 
 
 ### Usage
@@ -62,6 +67,71 @@ I am happy to take both. If there is demand, I can work on polishing the `delta-
 ### Credits
 
 Of course, a large part of `afl-sancov` development and testing has been possible due to Michael Rash's excellent tool and the open-source fuzzing community at afl-users and beyond. So, thank you all :-)
+
+### Sample workflow
+
+Suppose you have afl corpus after fuzzing the following test harness:
+
+```C
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+void bug() {
+	abort();
+}
+
+int main(int argc, char* argv[]) {
+	char buf[10];
+	int bytes_read = 0;
+
+	/* Reset state. */
+	memset(buf, 0, 10);
+
+	/* Read input data. */
+	bytes_read = read(0, buf, 10);
+
+	if (!bytes_read)
+		return 1;
+
+	/* Parse it in some vulnerable way. You'd normally call a library here. */
+	if (!strcmp(buf, "pwn"))
+		bug();
+	else
+		puts("works!");
+
+	return 0;
+}
+```
+
+then, you should get output like so (in afl-sync-dir/sancov/delta-diff/<crash_filename>.json) 
+
+
+```json
+{
+    "shrink-percent": 85.71428571428572, 
+    "dice-linecount": 1, 
+    "slice-linecount": 7, 
+    "diff-node-spec": [
+        {
+            "count": 1, 
+            "line": "/home/bhargava/work/gitlab/afl-sancov/tests/test-sancov.c:main:25:3"
+        }
+    ], 
+    "crashing-input": "HARDEN:0001,SESSION000:id:000000,sig:06,src:000003,op:havoc,rep:2", 
+    "parent-input": "id:000003,src:000001,op:havoc,rep:4,+cov"
+}
+
+```
+
+Points of interest are:
+
+- slice-linecount: How many lines were executed by the crashing input
+- dice-linecount: How many lines were *exclusively* executed by the crashing input when compared with the slice of it's parent (queue) input
+- diff-node-spec: What the "dice" lines exactly are
+- crashing/parent inputs in question
+- shrink percent: (100-(dice-linecount/slice-linecount)*100)
 
 ### Full usage
 
