@@ -127,11 +127,11 @@ then, you should get output like so (in afl-sync-dir/sancov/delta-diff/`crash_fi
 
 Points of interest are:
 
-- slice-linecount: How many lines were executed by the crashing input
-- dice-linecount: How many lines were *exclusively* executed by the crashing input when compared with the slice of it's parent (queue) input
-- diff-node-spec: What the "dice" lines exactly are
-- crashing/parent inputs in question
-- shrink percent: (100-(dice-linecount/slice-linecount)*100)
+- *slice-linecount*: How many lines were executed by the crashing input
+- *dice-linecount*: How many lines were *exclusively* executed by the crashing input when compared with the slice of it's parent (queue) input
+- *diff-node-spec*: What the "dice" lines exactly are
+- *crashing/parent inputs*
+- *shrink percent = (100-(dice-linecount/slice-linecount)*100)*
 
 ### Full usage
 
