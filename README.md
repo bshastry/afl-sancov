@@ -138,7 +138,7 @@ shrink-percent = (100-(dice-linecount/slice-linecount)*100)
 
 ### Full usage
 
-```bash
+```text
 $ afl-sancov -h
 
 usage: A tool for coverage consolidation and program spectrum analysis
