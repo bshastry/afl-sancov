@@ -45,6 +45,16 @@ class TestAflSanCov(unittest.TestCase):
     # afl_cov_live       = './afl/afl-cov-generator-live.sh'
 
     top_out_dir  = './afl-out'
+    sancov_dir = top_out_dir + '/sancov'
+    dd_dir = sancov_dir + '/delta-diff'
+    expects_dir = './expects'
+    dd_filename1 = '/HARDEN:0001,SESSION000:id:000000,sig:06,src:000003,op:havoc,rep:2.json'
+    dd_filename2 = '/HARDEN:0001,SESSION001:id:000000,sig:06,src:000003,op:havoc,rep:4.json'
+    dd_file1 = dd_dir + dd_filename1
+    dd_file2 = dd_dir + dd_filename2
+    expects_file1 = expects_dir + dd_filename1
+    expects_file2 = expects_dir + dd_filename2
+
 #    live_afl_cmd = './fuzzing-wrappers/server-access-redir.sh'
 #    live_parallel_afl_cmd = './fuzzing-wrappers/server-access-parallel-redir.sh'
 
@@ -108,10 +118,24 @@ class TestAflSanCov(unittest.TestCase):
         ### generate coverage, and then try to regenerate without --overwrite
         self.do_cmd("%s --afl-queue-id-limit 1 --overwrite" \
                         % (self.single_generator))
+
+        self.assertTrue(os.path.exists(self.sancov_dir),
+                        "No sancov dir generated during invocation")
         out_str = ''.join(self.do_cmd("%s --afl-queue-id-limit 1" \
                         % (self.single_generator)))
         self.assertTrue("use --overwrite" in out_str,
                 "Missing --overwrite not caught")
+
+    def test_ddmode(self):
+        self.do_cmd("%s --overwrite --dd-mode".format(self.single_generator))
+        self.assertTrue(os.path.exists(self.dd_dir),
+                        "No delta-diff dir generated during dd-mode invocation")
+        self.assertTrue((os.path.exists(self.dd_file1) and os.path.exists(self.dd_file2)),
+                        "Missing delta-diff file(s) during dd-mode invocation")
+        self.assertEqual(open(self.dd_file1).read(), open(self.expects_file1).read(),
+                         "Delta-diff file {} does not match".format(self.dd_filename1))
+        self.assertEqual(open(self.dd_file2).read(), open(self.expects_file2).read(),
+                         "Delta-diff file {} does not match".format(self.dd_filename2))
 
     # def test_stop_requires_fuzz_dir(self):
     #     self.assertTrue('Must set'
