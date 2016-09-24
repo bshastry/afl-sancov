@@ -43,7 +43,7 @@ def main():
         cmds[cmd] = reporter.which(cmd)
         if not cmds[cmd]:
             print "[*] Could not find command '%s', exiting." % (cmd)
-            return
+            return False
     print "[+] Required binaries exist."
 
     ### clone the fwknop repository since the test suite operates
