@@ -132,6 +132,11 @@ class TestAflSanCov(unittest.TestCase):
                         "No delta-diff dir generated during dd-mode invocation")
         self.assertTrue((os.path.exists(self.dd_file1) and os.path.exists(self.dd_file2)),
                         "Missing delta-diff file(s) during dd-mode invocation")
+        ddfile1 = open(self.dd_file1).read()
+        print ddfile1
+        expects1 = open(self.expects_file1).read()
+        print expects1
+
         self.assertEqual(open(self.dd_file1).read(), open(self.expects_file1).read(),
                          "Delta-diff file {} does not match".format(self.dd_filename1))
         self.assertEqual(open(self.dd_file2).read(), open(self.expects_file2).read(),
