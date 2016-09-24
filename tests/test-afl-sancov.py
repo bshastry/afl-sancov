@@ -127,7 +127,8 @@ class TestAflSanCov(unittest.TestCase):
                 "Missing --overwrite not caught")
 
     def test_ddmode(self):
-        self.do_cmd("%s --overwrite --dd-mode".format(self.single_generator))
+        out = self.do_cmd("%s --overwrite --dd-mode".format(self.single_generator))
+        print out
         self.assertTrue(os.path.exists(self.dd_dir),
                         "No delta-diff dir generated during dd-mode invocation")
         self.assertTrue((os.path.exists(self.dd_file1) and os.path.exists(self.dd_file2)),
