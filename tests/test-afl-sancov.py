@@ -29,6 +29,7 @@ import unittest
 import time
 import signal
 import os
+import json
 try:
     import subprocess32 as subprocess
 except ImportError:
@@ -54,6 +55,7 @@ class TestAflSanCov(unittest.TestCase):
     dd_file2 = dd_dir + dd_filename2
     expects_file1 = expects_dir + dd_filename1
     expects_file2 = expects_dir + dd_filename2
+    expected_line_substring = 'afl-sancov/tests/test-sancov.c:main:25:3'
 
 #    live_afl_cmd = './fuzzing-wrappers/server-access-redir.sh'
 #    live_parallel_afl_cmd = './fuzzing-wrappers/server-access-parallel-redir.sh'
@@ -68,6 +70,27 @@ class TestAflSanCov(unittest.TestCase):
             for line in f:
                 out.append(line.rstrip('\n'))
         return out
+
+    def compare_json(self, file1, file2):
+        with open(file1) as data_file1:
+            data1 = json.load(data_file1)
+        with open(file2) as data_file2:
+            data2 = json.load(data_file2)
+        if data1["shrink-percent"] != data2["shrink-percent"]:
+            return False
+        if data1["dice-linecount"] != data2["dice-linecount"]:
+            return False
+        if data1["slice-linecount"] != data2["slice-linecount"]:
+            return False
+        if data1["diff-node-spec"][0]["count"] != data2["diff-node-spec"][0]["count"]:
+            return False
+        if self.expected_line_substring not in data1["diff-node-spec"][0]["line"]:
+            return False
+        if data1["crashing-input"] != data2["crashing-input"]:
+            return False
+        if data1["parent-input"] != data2["parent-input"]:
+            return False
+        return True
 
     ### start afl-cov in --live mode - this is for both single and
     ### parallel instance testing
@@ -132,15 +155,11 @@ class TestAflSanCov(unittest.TestCase):
                         "No delta-diff dir generated during dd-mode invocation")
         self.assertTrue((os.path.exists(self.dd_file1) and os.path.exists(self.dd_file2)),
                         "Missing delta-diff file(s) during dd-mode invocation")
-        ddfile1 = open(self.dd_file1).read()
-        print ddfile1
-        expects1 = open(self.expects_file1).read()
-        print expects1
 
-        self.assertEqual(open(self.dd_file1).read(), open(self.expects_file1).read(),
-                         "Delta-diff file {} does not match".format(self.dd_filename1))
-        self.assertEqual(open(self.dd_file2).read(), open(self.expects_file2).read(),
-                         "Delta-diff file {} does not match".format(self.dd_filename2))
+        self.assertTrue(self.compare_json(self.dd_file1, self.expects_file1),
+                        "Delta-diff file {} does not match".format(self.dd_filename1))
+        self.assertTrue(self.compare_json(self.dd_file2, self.expects_file2),
+                        "Delta-diff file {} does not match".format(self.dd_filename2))
 
     # def test_stop_requires_fuzz_dir(self):
     #     self.assertTrue('Must set'
