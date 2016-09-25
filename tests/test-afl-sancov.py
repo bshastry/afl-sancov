@@ -49,12 +49,17 @@ class TestAflSanCov(unittest.TestCase):
     sancov_dir = top_out_dir + '/sancov'
     dd_dir = sancov_dir + '/delta-diff'
     expects_dir = './expects'
+    expects_ddmode_dir = expects_dir + '/ddmode'
+    expects_ddnum_dir = expects_dir + '/ddnum'
     dd_filename1 = '/HARDEN:0001,SESSION000:id:000000,sig:06,src:000003,op:havoc,rep:2.json'
     dd_filename2 = '/HARDEN:0001,SESSION001:id:000000,sig:06,src:000003,op:havoc,rep:4.json'
     dd_file1 = dd_dir + dd_filename1
     dd_file2 = dd_dir + dd_filename2
-    expects_file1 = expects_dir + dd_filename1
-    expects_file2 = expects_dir + dd_filename2
+    expects_ddmode_file1 = expects_ddmode_dir + dd_filename1
+    expects_ddmode_file2 = expects_ddmode_dir + dd_filename2
+    expects_ddnum_file1 = expects_ddnum_dir + dd_filename1
+    expects_ddnum_file2 = expects_ddnum_dir + dd_filename2
+
     expected_line_substring = 'afl-sancov/tests/test-sancov.c:main:25:3'
 
 #    live_afl_cmd = './fuzzing-wrappers/server-access-redir.sh'
@@ -88,8 +93,9 @@ class TestAflSanCov(unittest.TestCase):
             return False
         if data1["crashing-input"] != data2["crashing-input"]:
             return False
-        if data1["parent-input"] != data2["parent-input"]:
-            return False
+        if 'parent-input' in data1 and 'parent-input' in data2:
+            if data1["parent-input"] != data2["parent-input"]:
+                return False
         return True
 
     ### start afl-cov in --live mode - this is for both single and
@@ -156,9 +162,21 @@ class TestAflSanCov(unittest.TestCase):
         self.assertTrue((os.path.exists(self.dd_file1) and os.path.exists(self.dd_file2)),
                         "Missing delta-diff file(s) during dd-mode invocation")
 
-        self.assertTrue(self.compare_json(self.dd_file1, self.expects_file1),
+        self.assertTrue(self.compare_json(self.dd_file1, self.expects_ddmode_file1),
                         "Delta-diff file {} does not match".format(self.dd_filename1))
-        self.assertTrue(self.compare_json(self.dd_file2, self.expects_file2),
+        self.assertTrue(self.compare_json(self.dd_file2, self.expects_ddmode_file2),
+                        "Delta-diff file {} does not match".format(self.dd_filename2))
+
+    def test_ddnum(self):
+        self.do_cmd("{} --overwrite --dd-mode --dd-num 5".format(self.single_generator))
+        self.assertTrue(os.path.exists(self.dd_dir),
+                        "No delta-diff dir generated during dd-num invocation")
+        self.assertTrue((os.path.exists(self.dd_file1) and os.path.exists(self.dd_file2)),
+                        "Missing delta-diff file(s) during dd-num invocation")
+
+        self.assertTrue(self.compare_json(self.dd_file1, self.expects_ddnum_file1),
+                        "Delta-diff file {} does not match".format(self.dd_filename1))
+        self.assertTrue(self.compare_json(self.dd_file2, self.expects_ddnum_file2),
                         "Delta-diff file {} does not match".format(self.dd_filename2))
 
     # def test_stop_requires_fuzz_dir(self):
