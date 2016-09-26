@@ -17,5 +17,12 @@ language: python
 python:
         - 2.7
 
+before_install:
+        - pip install coveralls
+        - pip install pytest pytest-cov
+
 install: ./install_deps.sh
-script: cd tests && python run.py
+
+script: cd tests && coverage run.py
+after_success:
+        - coveralls
