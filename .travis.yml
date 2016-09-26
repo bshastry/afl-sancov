@@ -23,6 +23,6 @@ before_install:
 
 install: ./install_deps.sh
 
-script: cd tests && coverage run.py
+script: cd tests && coverage run run.py
 after_success:
         - coveralls
