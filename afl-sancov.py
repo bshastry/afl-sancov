@@ -46,7 +46,7 @@ except ImportError:
 class AFLSancovReporter:
     """Base class for the AFL Sancov reporter"""
 
-    Version = '0.1'
+    Version = '1.0'
     Description = 'A tool for coverage consolidation and program spectrum analysis'
     Want_Output = True
     No_Output = False
