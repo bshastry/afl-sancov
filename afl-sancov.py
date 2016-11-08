@@ -73,9 +73,9 @@ class AFLSancovReporter:
                                          r"(sync:(?P<sync>[\w|\-]+),)?src:(?P<id>\d+).*$")
 
 
-    def __init__(self):
+    def __init__(self, args):
 
-        self.args = self.parse_cmdline()
+        self.args = self.parse_cmdline(args)
 
         self.cov_paths = {}
 
@@ -114,8 +114,6 @@ class AFLSancovReporter:
             return 1
 
         self.setup_parsing()
-
-        rv = 0
 
         if not self.args.dd_mode:
             rv = self.process_afl_queue()
@@ -919,8 +917,9 @@ class AFLSancovReporter:
     def extract_line_cov(self, fuzz_dir):
         cp = self.cov_paths['dirs'][fuzz_dir]
         # Extract coverage
-        self.rename_and_extract_linecov(cp['sancov_raw'])
-        return
+        if not self.rename_and_extract_linecov(cp['sancov_raw']):
+            return False
+        return True
 
     # Rename <binary_name>.<pid>.sancov to user-supplied `sancov_fname`
     # Extract linecov info into self.curr* report
@@ -1042,10 +1041,10 @@ class AFLSancovReporter:
 
         if env is None:
             subprocess.call(cmd, stdin=None,
-                            stdout=fh, stderr=subprocess.STDOUT, shell=True)
+                            stdout=fh, stderr=subprocess.STDOUT, shell=True, executable='/bin/bash')
         else:
             subprocess.call(cmd, stdin=None,
-                            stdout=fh, stderr=subprocess.STDOUT, shell=True, env=env)
+                            stdout=fh, stderr=subprocess.STDOUT, shell=True, env=env, executable='/bin/bash')
 
         fh.close()
 
@@ -1084,7 +1083,7 @@ class AFLSancovReporter:
     def import_unique_crashes(dir):
         return sorted(glob.glob(dir + "/*id:*"))
 
-    def parse_cmdline(self):
+    def parse_cmdline(self, args):
         p = ArgumentParser(self.Description)
 
         p.add_argument("-e", "--coverage-cmd", type=str,
@@ -1151,7 +1150,7 @@ class AFLSancovReporter:
         # p.add_argument("--dd-crash-file", type=str,
         #         help="Path to crashing input for deep analysis (used in --dd-mode)")
 
-        return p.parse_args()
+        return p.parse_args(args)
 
     def validate_args(self):
         if self.args.coverage_cmd:
@@ -1296,5 +1295,5 @@ class AFLSancovReporter:
 
 
 if __name__ == "__main__":
-    reporter = AFLSancovReporter()
+    reporter = AFLSancovReporter(sys.argv[1:])
     sys.exit(reporter.run())

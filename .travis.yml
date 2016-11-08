@@ -23,6 +23,6 @@ before_install:
 
 install: ./install_deps.sh
 
-script: cd tests && coverage run run.py
+script: cd tests && ./afl-sancov-generator.sh && coverage run test-afl-sancov.py
 after_success:
         - coveralls

@@ -23,11 +23,8 @@
 #  USA
 #
 
-from shutil import rmtree, copy
 from aflsancov import *
 import unittest
-import time
-import signal
 import os
 import json
 try:
@@ -39,9 +36,9 @@ class TestAflSanCov(unittest.TestCase):
 
     ### set a few paths
     tmp_file     = './tmp_cmd.out'
-    version_file = '../VERSION'
-    afl_cov_cmd  = './aflsancov.py'
-    single_generator   = './afl-sancov-generator.sh'
+    # version_file = '../VERSION'
+    # afl_cov_cmd  = './aflsancov.py'
+    # single_generator   = './afl-sancov-generator.sh'
     # parallel_generator = './afl/afl-cov-generator-parallel.sh'
     # afl_cov_live       = './afl/afl-cov-generator-live.sh'
 
@@ -65,16 +62,16 @@ class TestAflSanCov(unittest.TestCase):
 #    live_afl_cmd = './fuzzing-wrappers/server-access-redir.sh'
 #    live_parallel_afl_cmd = './fuzzing-wrappers/server-access-parallel-redir.sh'
 
-    def do_cmd(self, cmd):
-        out = []
-        fh = open(self.tmp_file, 'w')
-        subprocess.call(cmd, stdin=None,
-                stdout=fh, stderr=subprocess.STDOUT, shell=True)
-        fh.close()
-        with open(self.tmp_file, 'r') as f:
-            for line in f:
-                out.append(line.rstrip('\n'))
-        return out
+    # def do_cmd(self, cmd):
+    #     out = []
+    #     fh = open(self.tmp_file, 'w')
+    #     subprocess.call(cmd, stdin=None,
+    #             stdout=fh, stderr=subprocess.STDOUT, shell=True)
+    #     fh.close()
+    #     with open(self.tmp_file, 'r') as f:
+    #         for line in f:
+    #             out.append(line.rstrip('\n'))
+    #     return out
 
     def compare_json(self, file1, file2):
         with open(file1) as data_file1:
@@ -132,31 +129,44 @@ class TestAflSanCov(unittest.TestCase):
     #     return
 
     def test_version(self):
-        with open(self.version_file, 'r') as f:
-            version = f.readline().rstrip()
-        self.assertTrue(version
-                in ''.join(self.do_cmd("%s --version" % (self.afl_cov_cmd))),
-                "afl-sancov --version does not match VERSION file")
+        self.assertFalse(AFLSancovReporter(['--version']).run())
+        # with open(self.version_file, 'r') as f:
+        #     version = f.readline().rstrip()
+        # self.assertTrue(version
+        #         in ''.join(self.do_cmd("%s --version" % (self.afl_cov_cmd))),
+        #         "afl-sancov --version does not match VERSION file")
 
-    def test_help(self):
-        self.assertTrue('--verbose'
-                in ''.join(self.do_cmd("%s -h" % (self.afl_cov_cmd))),
-                "--verbose not in -h output")
+    # def test_help(self):
+    #     self.assertTrue('--verbose'
+    #             in ''.join(self.do_cmd("%s -h" % (self.afl_cov_cmd))),
+    #             "--verbose not in -h output")
 
     def test_overwrite_dir(self):
-        ### generate coverage, and then try to regenerate without --overwrite
-        self.do_cmd("%s --afl-queue-id-limit 1 --overwrite" \
-                        % (self.single_generator))
+        args = ['-d', './afl-out', '-e "cat AFL_FILE | ./test-sancov"', '--bin-path={}/test-sancov'.format(os.getcwd()),
+                '--sancov-path=/usr/bin/sancov-3.8', '--llvm-sym-path=/usr/bin/llvm-symbolizer-3.8',
+                '--pysancov-path=/usr/local/bin/pysancov']
+        reporter = AFLSancovReporter(args)
+        self.assertTrue(reporter.run())
 
-        self.assertTrue(os.path.exists(self.sancov_dir),
-                        "No sancov dir generated during invocation")
-        out_str = ''.join(self.do_cmd("%s --afl-queue-id-limit 1" \
-                        % (self.single_generator)))
-        self.assertTrue("use --overwrite" in out_str,
-                "Missing --overwrite not caught")
+
+        ### generate coverage, and then try to regenerate without --overwrite
+        # self.do_cmd("%s --afl-queue-id-limit 1 --overwrite" \
+        #                 % (self.single_generator))
+        #
+        # self.assertTrue(os.path.exists(self.sancov_dir),
+        #                 "No sancov dir generated during invocation")
+        # out_str = ''.join(self.do_cmd("%s --afl-queue-id-limit 1" \
+        #                 % (self.single_generator)))
+        # self.assertTrue("use --overwrite" in out_str,
+        #         "Missing --overwrite not caught")
 
     def test_ddmode(self):
-        self.do_cmd("{} --overwrite --dd-mode".format(self.single_generator))
+        args = ['-d', './afl-out', '-e', 'cat AFL_FILE | ./test-sancov', '--bin-path={}/test-sancov'.format(os.getcwd()),
+                '--sancov-path=/usr/bin/sancov-3.8', '--llvm-sym-path=/usr/bin/llvm-symbolizer-3.8',
+                '--pysancov-path=/usr/local/bin/pysancov', '--overwrite', '--dd-mode']
+        reporter = AFLSancovReporter(args)
+        self.assertFalse(reporter.run())
+        # self.do_cmd("{} --overwrite --dd-mode".format(self.single_generator))
         self.assertTrue(os.path.exists(self.dd_dir),
                         "No delta-diff dir generated during dd-mode invocation")
         self.assertTrue((os.path.exists(self.dd_file1) and os.path.exists(self.dd_file2)),
@@ -168,7 +178,12 @@ class TestAflSanCov(unittest.TestCase):
                         "Delta-diff file {} does not match".format(self.dd_filename2))
 
     def test_ddnum(self):
-        self.do_cmd("{} --overwrite --dd-mode --dd-num 5".format(self.single_generator))
+        args = ['-d', './afl-out', '-e', 'cat AFL_FILE | ./test-sancov', '--bin-path={}/test-sancov'.format(os.getcwd()),
+                '--sancov-path=/usr/bin/sancov-3.8', '--llvm-sym-path=/usr/bin/llvm-symbolizer-3.8',
+                '--pysancov-path=/usr/local/bin/pysancov', '--overwrite', '--dd-mode', '--dd-num=3']
+        # self.do_cmd("{} --overwrite --dd-mode --dd-num 5".format(self.single_generator))
+        reporter = AFLSancovReporter(args)
+        self.assertFalse(reporter.run())
         self.assertTrue(os.path.exists(self.dd_dir),
                         "No delta-diff dir generated during dd-num invocation")
         self.assertTrue((os.path.exists(self.dd_file1) and os.path.exists(self.dd_file2)),
