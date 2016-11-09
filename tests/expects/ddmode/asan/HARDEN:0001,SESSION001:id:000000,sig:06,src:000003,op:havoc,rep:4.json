@@ -1,0 +1,13 @@
+{
+    "shrink-percent": 80.0, 
+    "dice-linecount": 1, 
+    "slice-linecount": 5, 
+    "diff-node-spec": [
+        {
+            "count": 1, 
+            "line": "/home/bhargava/work/gitlab/afl-sancov/tests/test-sancov.c:main:25:3"
+        }
+    ], 
+    "crashing-input": "HARDEN:0001,SESSION001:id:000000,sig:06,src:000003,op:havoc,rep:4", 
+    "parent-input": "id:000003,sync:SESSION000,src:000003,+cov"
+}

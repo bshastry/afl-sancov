@@ -36,152 +36,99 @@ class TestAflSanCov(unittest.TestCase):
 
     ### set a few paths
     tmp_file     = './tmp_cmd.out'
-    # version_file = '../VERSION'
-    # afl_cov_cmd  = './aflsancov.py'
-    # single_generator   = './afl-sancov-generator.sh'
-    # parallel_generator = './afl/afl-cov-generator-parallel.sh'
-    # afl_cov_live       = './afl/afl-cov-generator-live.sh'
 
     top_out_dir  = './afl-out'
     sancov_dir = top_out_dir + '/sancov'
     dd_dir = sancov_dir + '/delta-diff'
     expects_dir = './expects'
-    expects_ddmode_dir = expects_dir + '/ddmode'
-    expects_ddnum_dir = expects_dir + '/ddnum'
+    expects_ddmode_ubsan_dir = expects_dir + '/ddmode/ubsan'
+    expects_ddnum_ubsan_dir = expects_dir + '/ddnum/ubsan'
+    expects_ddmode_asan_dir = expects_dir + '/ddmode/asan'
+    expects_ddnum_asan_dir = expects_dir + '/ddnum/asan'
     dd_filename1 = '/HARDEN:0001,SESSION000:id:000000,sig:06,src:000003,op:havoc,rep:2.json'
     dd_filename2 = '/HARDEN:0001,SESSION001:id:000000,sig:06,src:000003,op:havoc,rep:4.json'
     dd_file1 = dd_dir + dd_filename1
     dd_file2 = dd_dir + dd_filename2
-    expects_ddmode_file1 = expects_ddmode_dir + dd_filename1
-    expects_ddmode_file2 = expects_ddmode_dir + dd_filename2
-    expects_ddnum_file1 = expects_ddnum_dir + dd_filename1
-    expects_ddnum_file2 = expects_ddnum_dir + dd_filename2
+    ## UBSAN
+    expects_ddmode_ubsan_file1 = expects_ddmode_ubsan_dir + dd_filename1
+    expects_ddmode_ubsan_file2 = expects_ddmode_ubsan_dir + dd_filename2
+    expects_ddnum_ubsan_file1 = expects_ddnum_ubsan_dir + dd_filename1
+    expects_ddnum_ubsan_file2 = expects_ddnum_ubsan_dir + dd_filename2
+    ## ASAN
+    expects_ddmode_asan_file1 = expects_ddmode_asan_dir + dd_filename1
+    expects_ddmode_asan_file2 = expects_ddmode_asan_dir + dd_filename2
+    expects_ddnum_asan_file1 = expects_ddnum_asan_dir + dd_filename1
+    expects_ddnum_asan_file2 = expects_ddnum_asan_dir + dd_filename2
 
     expected_line_substring = 'afl-sancov/tests/test-sancov.c:main:25:3'
 
-#    live_afl_cmd = './fuzzing-wrappers/server-access-redir.sh'
-#    live_parallel_afl_cmd = './fuzzing-wrappers/server-access-parallel-redir.sh'
-
-    # def do_cmd(self, cmd):
-    #     out = []
-    #     fh = open(self.tmp_file, 'w')
-    #     subprocess.call(cmd, stdin=None,
-    #             stdout=fh, stderr=subprocess.STDOUT, shell=True)
-    #     fh.close()
-    #     with open(self.tmp_file, 'r') as f:
-    #         for line in f:
-    #             out.append(line.rstrip('\n'))
-    #     return out
-
     def compare_json(self, file1, file2):
+
         with open(file1) as data_file1:
             data1 = json.load(data_file1)
         with open(file2) as data_file2:
             data2 = json.load(data_file2)
-        if data1["shrink-percent"] != data2["shrink-percent"]:
-            return False
-        if data1["dice-linecount"] != data2["dice-linecount"]:
-            return False
-        if data1["slice-linecount"] != data2["slice-linecount"]:
-            return False
-        if data1["diff-node-spec"][0]["count"] != data2["diff-node-spec"][0]["count"]:
-            return False
-        if self.expected_line_substring not in data1["diff-node-spec"][0]["line"]:
-            return False
-        if data1["crashing-input"] != data2["crashing-input"]:
-            return False
+
+        self.assertEqual(data1["shrink-percent"], data2["shrink-percent"], 'Shrink percent did not match')
+        self.assertEqual(data1["dice-linecount"], data2["dice-linecount"], 'Dice line count did not match')
+        self.assertEqual(data1["slice-linecount"], data2["slice-linecount"], 'Slice line count did not match')
+        self.assertEqual(data1["diff-node-spec"][0]["count"], data2["diff-node-spec"][0]["count"],
+                         'Dice frequency did not match')
+        self.assertTrue(self.expected_line_substring in data1["diff-node-spec"][0]["line"],
+                        'Dice line did not match')
+        self.assertEqual(data1["crashing-input"], data2["crashing-input"], 'Crashing input did not match')
         if 'parent-input' in data1 and 'parent-input' in data2:
-            if data1["parent-input"] != data2["parent-input"]:
-                return False
+            self.assertEqual(data1["parent-input"], data2["parent-input"], 'Parent input did not match')
         return True
-
-    ### start afl-cov in --live mode - this is for both single and
-    ### parallel instance testing
-    # def live_init(self):
-    #     if is_dir(os.path.dirname(self.top_out_dir)):
-    #         if is_dir(self.top_out_dir):
-    #             rmtree(self.top_out_dir)
-    #     else:
-    #         if not is_dir(os.path.dirname(self.top_out_dir)):
-    #             os.mkdir(os.path.dirname(self.top_out_dir))
-    #
-    #     ### start up afl-cov in the background before AFL is running
-    #     try:
-    #         subprocess.Popen([self.afl_cov_live])
-    #     except OSError:
-    #         return False
-    #     time.sleep(2)
-    #     return True
-
-    # def afl_stop(self):
-    #
-    #     ### stop any afl-fuzz instances
-    #     self.do_cmd("%s --stop-afl --afl-fuzzing-dir %s" \
-    #             % (self.afl_cov_cmd, self.top_out_dir))
-    #
-    #     ### now stop afl-cov
-    #     afl_cov_pid = get_running_pid(
-    #             self.top_out_dir + '/cov/afl-cov-status',
-    #             'afl_cov_pid\s+\:\s+(\d+)')
-    #     if afl_cov_pid:
-    #         os.kill(afl_cov_pid, signal.SIGTERM)
-    #
-    #     return
 
     def test_version(self):
         self.assertFalse(AFLSancovReporter(['--version']).run())
-        # with open(self.version_file, 'r') as f:
-        #     version = f.readline().rstrip()
-        # self.assertTrue(version
-        #         in ''.join(self.do_cmd("%s --version" % (self.afl_cov_cmd))),
-        #         "afl-sancov --version does not match VERSION file")
-
-    # def test_help(self):
-    #     self.assertTrue('--verbose'
-    #             in ''.join(self.do_cmd("%s -h" % (self.afl_cov_cmd))),
-    #             "--verbose not in -h output")
 
     def test_overwrite_dir(self):
-        args = ['-d', './afl-out', '-e "cat AFL_FILE | ./test-sancov"', '--bin-path={}/test-sancov'.format(os.getcwd()),
+        args = ['-d', './afl-out', '-e "cat AFL_FILE | ./test-sancov-ubsan"', '--bin-path={}/test-sancov-ubsan'.format(os.getcwd()),
                 '--sancov-path=/usr/bin/sancov-3.8', '--llvm-sym-path=/usr/bin/llvm-symbolizer-3.8',
-                '--pysancov-path=/usr/local/bin/pysancov']
+                '--pysancov-path=/usr/local/bin/pysancov', '--crash-dir={}/unique'.format(os.getcwd())]
         reporter = AFLSancovReporter(args)
         self.assertTrue(reporter.run())
 
-
-        ### generate coverage, and then try to regenerate without --overwrite
-        # self.do_cmd("%s --afl-queue-id-limit 1 --overwrite" \
-        #                 % (self.single_generator))
-        #
-        # self.assertTrue(os.path.exists(self.sancov_dir),
-        #                 "No sancov dir generated during invocation")
-        # out_str = ''.join(self.do_cmd("%s --afl-queue-id-limit 1" \
-        #                 % (self.single_generator)))
-        # self.assertTrue("use --overwrite" in out_str,
-        #         "Missing --overwrite not caught")
-
-    def test_ddmode(self):
-        args = ['-d', './afl-out', '-e', 'cat AFL_FILE | ./test-sancov', '--bin-path={}/test-sancov'.format(os.getcwd()),
+    def test_ddmode_ubsan(self):
+        args = ['-d', './afl-out', '-e', 'cat AFL_FILE | ./test-sancov-ubsan', '--bin-path={}/test-sancov-ubsan'.format(os.getcwd()),
                 '--sancov-path=/usr/bin/sancov-3.8', '--llvm-sym-path=/usr/bin/llvm-symbolizer-3.8',
-                '--pysancov-path=/usr/local/bin/pysancov', '--overwrite', '--dd-mode']
+                '--pysancov-path=/usr/local/bin/pysancov', '--crash-dir={}/unique'.format(os.getcwd()),'--overwrite']
         reporter = AFLSancovReporter(args)
         self.assertFalse(reporter.run())
-        # self.do_cmd("{} --overwrite --dd-mode".format(self.single_generator))
         self.assertTrue(os.path.exists(self.dd_dir),
                         "No delta-diff dir generated during dd-mode invocation")
         self.assertTrue((os.path.exists(self.dd_file1) and os.path.exists(self.dd_file2)),
                         "Missing delta-diff file(s) during dd-mode invocation")
 
-        self.assertTrue(self.compare_json(self.dd_file1, self.expects_ddmode_file1),
+        self.assertTrue(self.compare_json(self.dd_file1, self.expects_ddmode_ubsan_file1),
                         "Delta-diff file {} does not match".format(self.dd_filename1))
-        self.assertTrue(self.compare_json(self.dd_file2, self.expects_ddmode_file2),
+        self.assertTrue(self.compare_json(self.dd_file2, self.expects_ddmode_ubsan_file2),
                         "Delta-diff file {} does not match".format(self.dd_filename2))
 
-    def test_ddnum(self):
-        args = ['-d', './afl-out', '-e', 'cat AFL_FILE | ./test-sancov', '--bin-path={}/test-sancov'.format(os.getcwd()),
+    def test_ddmode_ubsan_sancov_bug(self):
+        args = ['-d', './afl-out', '-e', 'cat AFL_FILE | ./test-sancov-ubsan', '--bin-path={}/test-sancov-ubsan'.format(os.getcwd()),
                 '--sancov-path=/usr/bin/sancov-3.8', '--llvm-sym-path=/usr/bin/llvm-symbolizer-3.8',
-                '--pysancov-path=/usr/local/bin/pysancov', '--overwrite', '--dd-mode', '--dd-num=3']
-        # self.do_cmd("{} --overwrite --dd-mode --dd-num 5".format(self.single_generator))
+                '--pysancov-path=/usr/local/bin/pysancov', '--crash-dir={}/unique'.format(os.getcwd()),'--overwrite',
+                '--sancov-bug']
+        reporter = AFLSancovReporter(args)
+        self.assertFalse(reporter.run())
+        self.assertTrue(os.path.exists(self.dd_dir),
+                        "No delta-diff dir generated during dd-mode invocation")
+        self.assertTrue((os.path.exists(self.dd_file1) and os.path.exists(self.dd_file2)),
+                        "Missing delta-diff file(s) during dd-mode invocation")
+
+        self.assertTrue(self.compare_json(self.dd_file1, self.expects_ddmode_ubsan_file1),
+                        "Delta-diff file {} does not match".format(self.dd_filename1))
+        self.assertTrue(self.compare_json(self.dd_file2, self.expects_ddmode_ubsan_file2),
+                        "Delta-diff file {} does not match".format(self.dd_filename2))
+
+    def test_ddnum_ubsan(self):
+        args = ['-d', './afl-out', '-e', 'cat AFL_FILE | ./test-sancov-ubsan', '--bin-path={}/test-sancov-ubsan'.format(os.getcwd()),
+                '--sancov-path=/usr/bin/sancov-3.8', '--llvm-sym-path=/usr/bin/llvm-symbolizer-3.8',
+                '--pysancov-path=/usr/local/bin/pysancov', '--overwrite', '--dd-num=3',
+                '--crash-dir={}/unique'.format(os.getcwd())]
         reporter = AFLSancovReporter(args)
         self.assertFalse(reporter.run())
         self.assertTrue(os.path.exists(self.dd_dir),
@@ -189,122 +136,143 @@ class TestAflSanCov(unittest.TestCase):
         self.assertTrue((os.path.exists(self.dd_file1) and os.path.exists(self.dd_file2)),
                         "Missing delta-diff file(s) during dd-num invocation")
 
-        self.assertTrue(self.compare_json(self.dd_file1, self.expects_ddnum_file1),
+        self.assertTrue(self.compare_json(self.dd_file1, self.expects_ddnum_ubsan_file1),
                         "Delta-diff file {} does not match".format(self.dd_filename1))
-        self.assertTrue(self.compare_json(self.dd_file2, self.expects_ddnum_file2),
+        self.assertTrue(self.compare_json(self.dd_file2, self.expects_ddnum_ubsan_file2),
                         "Delta-diff file {} does not match".format(self.dd_filename2))
 
-    # def test_stop_requires_fuzz_dir(self):
-    #     self.assertTrue('Must set'
-    #             in ''.join(self.do_cmd("%s --stop-afl" % (self.afl_cov_cmd))),
-    #             "--afl-fuzzing-dir missing from --stop-afl mode")
+    def test_ddnum_ubsan_sancov_bug(self):
+        args = ['-d', './afl-out', '-e', 'cat AFL_FILE | ./test-sancov-ubsan',
+                '--bin-path={}/test-sancov-ubsan'.format(os.getcwd()),
+                '--sancov-path=/usr/bin/sancov-3.8', '--llvm-sym-path=/usr/bin/llvm-symbolizer-3.8',
+                '--pysancov-path=/usr/local/bin/pysancov', '--overwrite', '--dd-num=3',
+                '--crash-dir={}/unique'.format(os.getcwd()), '--sancov-bug']
+        reporter = AFLSancovReporter(args)
+        self.assertFalse(reporter.run())
+        self.assertTrue(os.path.exists(self.dd_dir),
+                        "No delta-diff dir generated during dd-num invocation")
+        self.assertTrue((os.path.exists(self.dd_file1) and os.path.exists(self.dd_file2)),
+                        "Missing delta-diff file(s) during dd-num invocation")
 
-    # def test_func_search_requires_fuzz_dir(self):
-    #     self.assertTrue('Must set'
-    #             in ''.join(self.do_cmd("%s --func-search test" % (self.afl_cov_cmd))),
-    #             "--afl-fuzzing-dir missing from --func-search mode")
+        self.assertTrue(self.compare_json(self.dd_file1, self.expects_ddnum_ubsan_file1),
+                        "Delta-diff file {} does not match".format(self.dd_filename1))
+        self.assertTrue(self.compare_json(self.dd_file2, self.expects_ddnum_ubsan_file2),
+                        "Delta-diff file {} does not match".format(self.dd_filename2))
 
-    # def test_line_search_requires_fuzz_dir(self):
-    #     self.assertTrue('Must set'
-    #             in ''.join(self.do_cmd("%s --line-search 1234" % (self.afl_cov_cmd))),
-    #             "--afl-fuzzing-dir missing from --line-search mode")
 
-    # def test_live_parallel(self):
-    #
-    #     if not self.live_init():
-    #         return self.assertTrue(False, "Could not run generator cmd: %s" \
-    #                 % (self.afl_cov_live))
-    #
-    #     ### put the wrapper in place
-    #     wrapper ='fwknop-afl.git/test/afl/fuzzing-wrappers' + \
-    #             '/server-access-parallel-redir.sh'
-    #     if os.path.exists(wrapper):
-    #         os.remove(wrapper)
-    #     copy('afl/server-access-parallel-redir.sh', wrapper)
-    #     curr_dir = os.getcwd()
-    #     os.chdir('./fwknop-afl.git/test/afl')
-    #
-    #     ### now start two copies of AFL
-    #     try:
-    #         subprocess.Popen([self.live_parallel_afl_cmd, "-M", "fuzzer01"])
-    #     except OSError:
-    #         os.chdir(curr_dir)
-    #         return self.assertTrue(False,
-    #                 "Could not run live_parallel_afl_cmd: %s -M fuzzer01" \
-    #                         % (self.live_parallel_afl_cmd))
-    #
-    #     try:
-    #         subprocess.Popen([self.live_parallel_afl_cmd, "-S", "fuzzer02"])
-    #     except OSError:
-    #         os.chdir(curr_dir)
-    #         return self.assertTrue(False,
-    #                 "Could not run live_parallel_afl_cmd: %s -S fuzzer02" \
-    #                         % (self.live_parallel_afl_cmd))
-    #
-    #     os.chdir(curr_dir)
-    #
-    #     time.sleep(3)
-    #
-    #     self.afl_stop()
-    #
-    #     if not (is_dir(self.top_out_dir + '/fuzzer01')
-    #             and is_dir(self.top_out_dir + '/fuzzer02')):
-    #         return self.assertTrue(False,
-    #                 "fuzzer01 or fuzzer02 directory missing")
-    #
-    #     ### check for the coverage directory since afl-cov should have
-    #     ### seen the running AFL instance by now
-    #     return self.assertTrue(is_dir(self.top_out_dir + '/cov'),
-    #             "live coverage directory '%s' does not exist" \
-    #                     % (self.top_out_dir + '/cov'))
-    #
-    # def test_live(self):
-    #
-    #     if not self.live_init():
-    #         return self.assertTrue(False, "Could not run generator cmd: %s" \
-    #                 % (self.afl_cov_live))
-    #
-    #     ### put the wrapper in place
-    #     wrapper = 'fwknop-afl.git/test/afl/fuzzing-wrappers/server-access-redir.sh'
-    #     if os.path.exists(wrapper):
-    #         os.remove(wrapper)
-    #     copy('afl/server-access-redir.sh', wrapper)
-    #     curr_dir = os.getcwd()
-    #     os.chdir('./fwknop-afl.git/test/afl')
-    #
-    #     ### now start AFL and let it run for longer than --sleep in the
-    #     ### generator script - then look for the coverage directory
-    #     try:
-    #         subprocess.Popen([self.live_afl_cmd])
-    #     except OSError:
-    #         os.chdir(curr_dir)
-    #         return self.assertTrue(False,
-    #                 "Could not run live_afl_cmd: %s" % (self.live_afl_cmd))
-    #     os.chdir(curr_dir)
-    #
-    #     time.sleep(3)
-    #
-    #     self.afl_stop()
-    #
-    #     ### check for the coverage directory since afl-cov should have
-    #     ### seen the running AFL instance by now
-    #     return self.assertTrue(is_dir(self.top_out_dir + '/cov'),
-    #             "live coverage directory '%s' does not exist" \
-    #                     % (self.top_out_dir + '/cov'))
+    def test_ddmode_asan(self):
+        args = ['-d', './afl-out', '-e', 'cat AFL_FILE | ./test-sancov-asan',
+                '--bin-path={}/test-sancov-asan'.format(os.getcwd()),
+                '--sancov-path=/usr/bin/sancov-3.8', '--llvm-sym-path=/usr/bin/llvm-symbolizer-3.8',
+                '--pysancov-path=/usr/local/bin/pysancov', '--crash-dir={}/unique'.format(os.getcwd()), '--overwrite',
+                '--sanitizer=asan']
+        reporter = AFLSancovReporter(args)
+        self.assertFalse(reporter.run())
+        self.assertTrue(os.path.exists(self.dd_dir),
+                        "No delta-diff dir generated during dd-mode invocation")
+        self.assertTrue((os.path.exists(self.dd_file1) and os.path.exists(self.dd_file2)),
+                        "Missing delta-diff file(s) during dd-mode invocation")
 
-    # def test_queue_limit_5(self):
-    #     out_str = ''.join(self.do_cmd("%s --afl-queue-id-limit 5 --overwrite" \
-    #                     % (self.single_generator)))
-    #     self.assertTrue('Final lcov web report' in out_str
-    #             and "New 'line' coverage: 1571" in out_str)
-    #
-    # def test_queue_limit_5_parallel(self):
-    #     out_str = ''.join(self.do_cmd("%s --afl-queue-id-limit 5 --overwrite" \
-    #                     % (self.parallel_generator)))
-    #     self.assertTrue('Final lcov web report' in out_str
-    #             and "New 'line' coverage: 1571" in out_str
-    #             and "Imported 145 new test cases" in out_str
-    #             and "Imported 212 new test cases" in out_str)
+        self.assertTrue(self.compare_json(self.dd_file1, self.expects_ddmode_asan_file1),
+                        "Delta-diff file {} does not match".format(self.dd_filename1))
+        self.assertTrue(self.compare_json(self.dd_file2, self.expects_ddmode_asan_file2),
+                        "Delta-diff file {} does not match".format(self.dd_filename2))
+
+
+    def test_ddmode_asan_sancov_bug(self):
+        args = ['-d', './afl-out', '-e', 'cat AFL_FILE | ./test-sancov-asan',
+                '--bin-path={}/test-sancov-asan'.format(os.getcwd()),
+                '--sancov-path=/usr/bin/sancov-3.8', '--llvm-sym-path=/usr/bin/llvm-symbolizer-3.8',
+                '--pysancov-path=/usr/local/bin/pysancov', '--crash-dir={}/unique'.format(os.getcwd()), '--overwrite',
+                '--sancov-bug', '--sanitizer=asan']
+        reporter = AFLSancovReporter(args)
+        self.assertFalse(reporter.run())
+        self.assertTrue(os.path.exists(self.dd_dir),
+                        "No delta-diff dir generated during dd-mode invocation")
+        self.assertTrue((os.path.exists(self.dd_file1) and os.path.exists(self.dd_file2)),
+                        "Missing delta-diff file(s) during dd-mode invocation")
+
+        self.assertTrue(self.compare_json(self.dd_file1, self.expects_ddmode_asan_file1),
+                        "Delta-diff file {} does not match".format(self.dd_filename1))
+        self.assertTrue(self.compare_json(self.dd_file2, self.expects_ddmode_asan_file2),
+                        "Delta-diff file {} does not match".format(self.dd_filename2))
+
+
+    def test_ddnum_asan(self):
+        args = ['-d', './afl-out', '-e', 'cat AFL_FILE | ./test-sancov-asan',
+                '--bin-path={}/test-sancov-asan'.format(os.getcwd()),
+                '--sancov-path=/usr/bin/sancov-3.8', '--llvm-sym-path=/usr/bin/llvm-symbolizer-3.8',
+                '--pysancov-path=/usr/local/bin/pysancov', '--overwrite', '--dd-num=3',
+                '--crash-dir={}/unique'.format(os.getcwd()), '--sanitizer=asan']
+        reporter = AFLSancovReporter(args)
+        self.assertFalse(reporter.run())
+        self.assertTrue(os.path.exists(self.dd_dir),
+                        "No delta-diff dir generated during dd-num invocation")
+        self.assertTrue((os.path.exists(self.dd_file1) and os.path.exists(self.dd_file2)),
+                        "Missing delta-diff file(s) during dd-num invocation")
+
+        self.assertTrue(self.compare_json(self.dd_file1, self.expects_ddnum_asan_file1),
+                        "Delta-diff file {} does not match".format(self.dd_filename1))
+        self.assertTrue(self.compare_json(self.dd_file2, self.expects_ddnum_asan_file2),
+                        "Delta-diff file {} does not match".format(self.dd_filename2))
+
+
+    def test_ddnum_asan_sancov_bug(self):
+        args = ['-d', './afl-out', '-e', 'cat AFL_FILE | ./test-sancov-asan',
+                '--bin-path={}/test-sancov-asan'.format(os.getcwd()),
+                '--sancov-path=/usr/bin/sancov-3.8', '--llvm-sym-path=/usr/bin/llvm-symbolizer-3.8',
+                '--pysancov-path=/usr/local/bin/pysancov', '--overwrite', '--dd-num=3',
+                '--crash-dir={}/unique'.format(os.getcwd()), '--sancov-bug', '--sanitizer=asan']
+        reporter = AFLSancovReporter(args)
+        self.assertFalse(reporter.run())
+        self.assertTrue(os.path.exists(self.dd_dir),
+                        "No delta-diff dir generated during dd-num invocation")
+        self.assertTrue((os.path.exists(self.dd_file1) and os.path.exists(self.dd_file2)),
+                        "Missing delta-diff file(s) during dd-num invocation")
+
+        self.assertTrue(self.compare_json(self.dd_file1, self.expects_ddnum_asan_file1),
+                        "Delta-diff file {} does not match".format(self.dd_filename1))
+        self.assertTrue(self.compare_json(self.dd_file2, self.expects_ddnum_asan_file2),
+                        "Delta-diff file {} does not match".format(self.dd_filename2))
+
+    def test_validate_cov_cmd(self):
+        args = []
+        reporter = AFLSancovReporter(args)
+        # Checks no cov cmd
+        self.assertTrue(reporter.run())
+        args = ['-e', 'cat FILE | ./test-sancov-asan']
+        reporter = AFLSancovReporter(args)
+        # Checks incorrect cov cmd
+        self.assertTrue(reporter.run())
+        args = ['-e', 'cat AFL_FILE | ./test-sancov-asan']
+        reporter = AFLSancovReporter(args)
+        # Checks no afl fuzz dir
+        self.assertTrue(reporter.run())
+        args.extend(['-d', './afl-out'])
+        reporter = AFLSancovReporter(args)
+        # Checks no crash dir
+        self.assertTrue(reporter.run())
+        args.extend(['--crash-dir={}/unique'.format(os.getcwd())])
+        reporter = AFLSancovReporter(args)
+        # Checks no bin path
+        self.assertTrue(reporter.run())
+        args.extend(['--bin-path={}/test-sancov-noexist'.format(os.getcwd())])
+        reporter = AFLSancovReporter(args)
+        # Checks incorrect bin path
+        self.assertTrue(reporter.run())
+        args[len(args)-1] = '--bin-path={}/test-sancov-ubsan'.format(os.getcwd())
+        args.extend(['--sancov-path=sancov-noexist'])
+        reporter = AFLSancovReporter(args)
+        # Checks incorrect sancov path
+        self.assertTrue(reporter.run())
+        args[len(args)-1] = '--pysancov-path=pysancov-noexist'
+        reporter = AFLSancovReporter(args)
+        # Checks incorrect pysancov path
+        self.assertTrue(reporter.run())
+        args[len(args)-1] = '--llvm-sym-path=llvm-symbolizer-noexist'
+        reporter = AFLSancovReporter(args)
+        # Checks incorrect llvm-sym path
+        self.assertTrue(reporter.run())
 
 if __name__ == "__main__":
     unittest.main()

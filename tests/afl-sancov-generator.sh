@@ -4,6 +4,8 @@
 echo -e "\t[+] Generating coverage information for test-sancov.c"
 rm -f test-sancov
 clang-3.8 -O0 -g -fsanitize=undefined -fsanitize-coverage=edge \
-       	test-sancov.c -o test-sancov
+       	test-sancov.c -o test-sancov-ubsan
+clang-3.8 -O0 -g -fsanitize=address -fsanitize-coverage=edge \
+	test-sancov.c -o test-sancov-asan
 
 exit 0

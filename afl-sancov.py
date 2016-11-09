@@ -2,7 +2,7 @@
 #
 #  File: afl-sancov
 #
-#  Version: 0.1
+#  Version: 1.1
 #
 #  Purpose: Leverage sancov towards coverage consolidation, program spec analysis etc.
 #
@@ -46,8 +46,8 @@ except ImportError:
 class AFLSancovReporter:
     """Base class for the AFL Sancov reporter"""
 
-    Version = '1.0'
-    Description = 'A tool for coverage consolidation and program spectrum analysis'
+    Version = '1.1'
+    Description = 'A tool for spectrum based fault localization'
     Want_Output = True
     No_Output = False
 
@@ -115,13 +115,10 @@ class AFLSancovReporter:
 
         self.setup_parsing()
 
-        if not self.args.dd_mode:
-            rv = self.process_afl_queue()
+        if self.args.dd_num == 1:
+            rv = self.process_afl_crashes()
         else:
-            if self.args.dd_num == 1:
-                rv = self.process_afl_crashes()
-            else:
-                rv = self.process_afl_crashes_deep()
+            rv = self.process_afl_crashes_deep()
 
         return not rv
 
@@ -305,7 +302,7 @@ class AFLSancovReporter:
         :return:
         '''
 
-        crash_files = self.import_unique_crashes(self.unique_crash_path)
+        crash_files = self.import_unique_crashes(self.args.crash_dir)
         num_crash_files = len(crash_files)
 
         self.logr("\n*** Imported %d new crash files from: %s\n" \
@@ -391,7 +388,7 @@ class AFLSancovReporter:
         :return:
         '''
 
-        crash_files = self.import_unique_crashes(self.unique_crash_path)
+        crash_files = self.import_unique_crashes(self.args.crash_dir)
         num_crash_files = len(crash_files)
 
         self.logr("\n*** Imported %d new crash files from: %s\n" \
@@ -436,31 +433,6 @@ class AFLSancovReporter:
 
             self.write_result_as_json(cbasename, pbasename)
 
-            ## Legacy code
-            # gp = self.linecov_report_to_str(self.crashdd_pos_report)
-            #
-            # # Extend the global list with current crash delta diff
-            # self.crashdd_pos_list.extend(self.crashdd_pos_report)
-            #
-            # crashdd_outfile = self.cov_paths['delta_diff_dir'] + '/' + cbasename + '.dd'
-            #
-            # header = "diff crash ({}) -> parent ({})".format(cbasename, pbasename)
-            # self.write_file(header, crashdd_outfile)
-            # self.write_strlist_to_file(gp, crashdd_outfile)
-            #
-            # ### Delete later
-            # parentdd_outfile = self.cov_paths['delta_diff_dir'] + '/' + pbasename + '.dd'
-            # header = "diff parent ({}) -> crash ({})".format(pbasename, cbasename)
-            # self.write_file(header, parentdd_outfile)
-            #
-            # self.parentdd_pos_report = self.prev_pos_report.difference(self.curr_pos_report)
-            # self.parentdd_pos_report = sorted(self.parentdd_pos_report, key=lambda cov_entry: cov_entry[0])
-            # parentgp = self.linecov_report_to_str(self.parentdd_pos_report)
-            #
-            # self.write_strlist_to_file(parentgp, parentdd_outfile)
-            ## Legacy code
-
-        # self.dd_obtain_stats()
         self.cleanup()
         return True
 
@@ -515,161 +487,6 @@ class AFLSancovReporter:
 
     def find_parent_crashing(self, crash_fname):
         return self.get_parent(crash_fname)
-
-    def process_afl_queue(self):
-
-        rv = True
-        has_run_once = False
-
-        # Current AFL (queue) input filename
-        last_processed_file = ''
-        last_sancov_raw = ''
-
-        # Used to track progress across multiple fuzzing dirs
-        num_processed_files = 0
-        num_imported_files = 0
-        prev_num_queue_files = 0
-        dir_ctr = 0
-
-        # Legacy of --live mode
-        while True:
-
-            if not self.import_afl_dirs():
-                rv = False
-                break
-
-            for fuzz_dir in self.cov_paths['dirs']:
-
-                queue_id = 0
-                new_files = self.import_test_cases(fuzz_dir + '/queue')
-
-                # Record old queue length for test case count
-                if dir_ctr > 0:
-                    prev_num_queue_files = num_queue_files
-
-                num_queue_files = len(new_files)
-                num_imported_files += num_queue_files
-                dir_ctr += 1
-
-                if new_files:
-                    self.logr("\n*** Imported %d new test cases from: %s\n" \
-                              % (num_queue_files, (fuzz_dir + '/queue')))
-
-                for f in new_files:
-
-                    out_lines = []
-                    # Since new_files is a sorted list of queue ids that is most likely
-                    # named sequentially, `queue_id` is a good heuristic
-                    # for guessing id contained in plot data
-                    curr_cycle = self.get_cycle_num(fuzz_dir, queue_id)
-                    queue_id += 1
-
-                    self.logr("[+] AFL test case: %s (%d / %d), cycle: %d" \
-                              % (os.path.basename(f), (queue_id + prev_num_queue_files), num_imported_files,
-                                 curr_cycle))
-
-                    self.gen_paths_queue(fuzz_dir, f)
-
-                    if dir_ctr > 1 and not self.cov_paths['dirs'][fuzz_dir]['prev_file']:
-                        assert last_processed_file, "Last processed file is empty!"
-                        self.cov_paths['dirs'][fuzz_dir]['prev_file'] = last_processed_file
-                        self.cov_paths['dirs'][fuzz_dir]['prev_sancov_raw'] = last_sancov_raw
-
-                    assert self.args.coverage_cmd, "Missing coverage cmd! We shouldn't be here!"
-
-                    ### Dry run to eliminate queue inputs that crash program
-                    cov_cmd = self.args.coverage_cmd.replace('AFL_FILE', f)
-                    if self.does_dry_run_throw_error(cov_cmd):
-                        self.logr("Queue file ({}) crashes the program! Ignoring.".format(f))
-                        continue
-
-                    ### execute the command to generate code coverage stats
-                    ### for the current AFL test case file
-                    sancov_env = self.get_sancov_env_for_afl_input(fuzz_dir, os.path.basename(f))
-                    if has_run_once:
-                        self.run_cmd(cov_cmd, self.No_Output, sancov_env)
-                    else:
-                        out_lines = self.run_cmd(cov_cmd, self.Want_Output, sancov_env)
-                        has_run_once = True
-
-                    ### Extract sancov stats for this test case
-                    ### This writes pos and zero line cov reports to two distinct
-                    ### reports and appends them to self.curr_reports.
-                    self.extract_line_cov(fuzz_dir)
-
-                    ### Convert to gcov style report?
-
-                    ### Diff against global report and update global report with
-                    ### new coverage info
-                    if self.cov_paths['dirs'][fuzz_dir]['prev_file']:
-                        self.coverage_diff(fuzz_dir, f)
-                    else:
-                        # Bootstrap global dict
-                        self.global_pos_report = self.curr_pos_report
-                        self.global_zero_report = self.curr_zero_report
-
-                    # if not cargs.disable_lcov_web and cargs.lcov_web_all:
-                    #     gen_web_cov_report(fuzz_dir, cov_paths, cargs)
-
-                    ### log the output of the very first coverage command to
-                    ### assist in troubleshooting
-                    if len(out_lines):
-                        self.logr("\n\n++++++ BEGIN - first exec output for CMD: %s" % \
-                                  (self.args.coverage_cmd.replace('AFL_FILE', f)))
-                        for line in out_lines:
-                            self.logr("    %s" % (line))
-                        self.logr("++++++ END\n")
-
-                    num_processed_files += 1
-
-                    # We need last_processed files to link last processed file of one fuzz dir
-                    # to first processed file of the next fuzz dir
-                    last_processed_file = f
-                    last_sancov_raw = self.cov_paths['dirs'][fuzz_dir]['sancov_raw']
-
-                    # Back-up current queue file coverage info for diff against next queue file
-                    # coverage. Note: This is a shallow copy because curr* reports are newly
-                    # constructed each time.
-                    self.prev_pos_report = self.curr_pos_report
-                    self.prev_zero_report = self.curr_zero_report
-
-                    self.cov_paths['dirs'][fuzz_dir]['prev_file'] = f
-
-                    if self.args.afl_queue_id_limit \
-                            and queue_id > self.args.afl_queue_id_limit:
-                        self.logr("[+] queue/ id limit of %d reached..." \
-                                  % self.args.afl_queue_id_limit)
-                        break
-
-            break
-
-        if num_processed_files > 0:
-            self.logr("[+] Processed %d / %d test cases.\n" \
-                      % (num_processed_files, num_imported_files))
-        else:
-            if rv:
-                self.logr("[*] Did not find any AFL test cases, exiting.\n")
-            rv = False
-
-        ### write out the final zero coverage and positive coverage reports
-        self.write_global_cov()
-
-        # if not cargs.disable_lcov_web:
-        #     gen_web_cov_report(fuzz_dir, cov_paths, cargs)
-
-        return rv
-
-    def write_global_cov(self):
-        self.global_pos_report = sorted(self.global_pos_report, \
-                                        key=lambda cov_entry: cov_entry[0])
-        self.global_zero_report = sorted(self.global_zero_report, \
-                                         key=lambda cov_entry: cov_entry[0])
-        gp = self.linecov_report_to_str(self.global_pos_report)
-        gz = self.linecov_report_to_str(self.global_zero_report)
-
-        self.write_strlist_to_file(gp, self.cov_paths['pos_cov'])
-        self.write_strlist_to_file(gz, self.cov_paths['zero_cov'])
-        return
 
     def init_tracking(self):
 
@@ -736,94 +553,6 @@ class AFLSancovReporter:
 
         return True
 
-    def gen_paths_queue(self, fuzz_dir, afl_file):
-
-        basename = os.path.basename(afl_file)
-        basedir = os.path.basename(fuzz_dir)
-
-        cp = self.cov_paths['dirs'][fuzz_dir]
-
-        # Create subdirs inside diff,web, and cons using basedir as folder name
-        for k in ['diff_dir', 'web_dir', 'cons_dir']:
-            if not self.is_dir(self.cov_paths[k] + '/' + basedir):
-                os.mkdir(self.cov_paths[k] + '/' + basedir)
-
-        ### coverage diffs from one ID file to the next
-        cp['diff'] = self.cov_paths['diff_dir'] + '/' + basedir + '/' + basename
-
-        ### current id:NNNNNN* test case file
-        cp['id_file'] = basedir + '/' + basename
-
-        ### web files
-        cp['web_dir'] = self.cov_paths['web_dir'] + \
-                        '/' + basedir + '/' + basename
-
-        ### raw sancov file
-        cp['sancov_raw'] = self.cov_paths['cons_dir'] + \
-                           '/' + basedir + '/' + basename + '.sancov'
-
-        ### pos line cov
-        # cp['pos_line_cov'] = self.cov_paths['cons_dir'] + \
-        #         '/' + basedir + '/' + basename + '.pos_line_cov'
-        #
-        # ### zero line cov
-        # cp['zero_line_cov'] = self.cov_paths['cons_dir'] + \
-        #         '/' + basedir + '/' + basename + '.zero_line_cov'
-        #
-        # ### pos func cov
-        # cp['pos_func_cov'] = self.cov_paths['cons_dir'] + \
-        #         '/' + basedir + '/' + basename + '.pos_func_cov'
-        #
-        # ### zero func cov
-        # cp['zero_func_cov'] = self.cov_paths['cons_dir'] + \
-        #         '/' + basedir + '/' + basename + '.zero_func_cov'
-
-        if cp['prev_file']:
-            cp['prev_sancov_raw'] = self.cov_paths['cons_dir'] + '/' \
-                                    + basedir + '/' + os.path.basename(cp['prev_file']) \
-                                    + '.sancov'
-            # cp['prev_pos_line_cov'] = self.cov_paths['cons_dir'] + '/' \
-            #         + basedir + '/' + os.path.basename(cp['prev_file']) \
-            #         + '.pos_line_cov'
-            # cp['prev_zero_line_cov'] = self.cov_paths['cons_dir'] + '/' \
-            #         + basedir + '/' + os.path.basename(cp['prev_file']) \
-            #         + '.zero_line_cov'
-            # cp['prev_pos_func_cov'] = self.cov_paths['cons_dir'] + '/' \
-            #         + basedir + '/' + os.path.basename(cp['prev_file']) \
-            #         + '.pos_func_cov'
-            # cp['prev_zero_func_cov'] = self.cov_paths['cons_dir'] + '/' \
-            #         + basedir + '/' + os.path.basename(cp['prev_file']) \
-            #         + '.zero_func_cov'
-
-        return
-
-    # def gen_paths_ddmode(self, afl_file):
-    #
-    #     basename = os.path.basename(afl_file)
-    #
-    #     cp = self.cov_paths
-    #
-    #     ### raw sancov file
-    #     cp['sancov_raw'] = self.cov_paths['delta_diff_dir'] + \
-    #             '/' + basename + '.sancov'
-    #
-    #     ### For a single delta-diff run, prev_file should point to
-    #     ### non-crashing input (parent of crash file)
-    #     if cp['prev_file']:
-    #         cp['prev_sancov_raw'] = self.cov_paths['delta_diff_dir'] + '/' \
-    #                 + os.path.basename(cp['prev_file']) \
-    #                 + '.sancov'
-    #
-    #     return
-
-    def get_sancov_env_for_afl_input(self, fuzz_dir, afl_input):
-
-        cp = self.cov_paths['dirs'][fuzz_dir]
-        assert cp['sancov_raw'], "Attempting to write to non-existent " \
-                                 "sancov raw file"
-
-        return self.get_sancov_env(cp['sancov_raw'], afl_input)
-
     def get_sancov_env(self, sancov_output, afl_input):
 
         fpath, fname = os.path.split(sancov_output)
@@ -855,71 +584,6 @@ class AFLSancovReporter:
                     sancov_env['UBSAN_OPTIONS'] = 'coverage=1'
 
         return sancov_env
-
-    def coverage_diff(self, fuzz_dir, afl_file):
-
-        log_lines = []
-        delta_log_lines = []
-
-        cp = self.cov_paths['dirs'][fuzz_dir]
-
-        # Previous queue file and cons-cov dir
-        a_file = os.path.basename(cp['prev_file'])
-        a_dir = os.path.basename(os.path.dirname(cp['prev_sancov_raw']))
-
-        # Current queue file and cons-cov dir
-        b_file = os.path.basename(afl_file)
-        b_dir = os.path.basename(fuzz_dir)
-
-        ### with the coverage from the previous sancov results extracted
-        ### the previous time we went through this function, we remove
-        ### associated files unless instructed to keep them
-        if not self.args.preserve_all_sancov_files:
-            self.rm_prev_cov_files(cp)
-
-        ### We aren't interested in the number of times AFL has executed
-        ### a line or function (since we can't really get this anyway because
-        ### gcov stats aren't influenced by AFL directly) - what we want is
-        ### simply whether a new line or function has been executed by this
-        ### test case. So, we look for new positive coverage.
-
-        # Log lines contain pos difference in coverage information between a_file (prev queue input)
-        # and b_file (curr queue input)
-        log_lines.append("diff %s/%s -> %s/%s" % (a_dir, a_file, b_dir, b_file))
-        inter_queue_pos_diff = sorted(self.curr_pos_report.difference(self.prev_pos_report), \
-                                      key=lambda cov_entry: cov_entry[0])
-        log_lines += self.linecov_report_to_str(inter_queue_pos_diff)
-
-        # Delta log lines contain pos difference in cov between b_file (curr queue input)
-        # and global cov info
-        accu_queue_pos_diff = sorted(self.curr_pos_report.difference(self.global_pos_report), \
-                                     key=lambda cov_entry: cov_entry[0])
-        delta_log_lines += self.linecov_report_to_str(accu_queue_pos_diff)
-
-        # Update global cov
-        self.global_pos_report = self.global_pos_report.union(self.curr_pos_report)
-        self.global_zero_report = self.global_zero_report.intersection(self.curr_zero_report)
-
-        if len(log_lines):
-            self.logr("\n    Coverage diff %s/%s %s/%s" \
-                      % (a_dir, a_file, b_dir, b_file))
-            for l in log_lines:
-                self.logr(l)
-                self.append_file(l, cp['diff'])
-            self.logr("")
-
-        if len(delta_log_lines):
-            for l in delta_log_lines:
-                self.append_file(l, self.cov_paths['id_delta_cov'])
-
-        return
-
-    def extract_line_cov(self, fuzz_dir):
-        cp = self.cov_paths['dirs'][fuzz_dir]
-        # Extract coverage
-        if not self.rename_and_extract_linecov(cp['sancov_raw']):
-            return False
-        return True
 
     # Rename <binary_name>.<pid>.sancov to user-supplied `sancov_fname`
     # Extract linecov info into self.curr* report
@@ -986,14 +650,6 @@ class AFLSancovReporter:
         # Don't do this if you want to keep sets
         # return sorted(s, key=lambda cov_entry: cov_entry[0])
 
-    def linecov_report_to_str(self, lcreport):
-        tempstr = []
-        for (fp, func, ln, col) in lcreport:
-            tempstr.append("File: {}".format(fp))
-            tempstr.append("Func: {}".format(func))
-            tempstr.append("Line: {}  Col: {}\n".format(ln, col))
-        return tempstr
-
     def find_sancov_file_and_rename(self, searchdir, newname):
 
         for filename in os.listdir(searchdir):
@@ -1008,13 +664,6 @@ class AFLSancovReporter:
         # assert False, "sancov file {} not found!".format(newname)
         self.logr("Could not generate coverage info for parent {}. Bailing out!".format(newname))
         return False
-
-    @staticmethod
-    def rm_prev_cov_files(ct):
-        prev_raw_filepath = ct['prev_sancov_raw']
-        if os.path.exists(prev_raw_filepath):
-            os.remove(prev_raw_filepath)
-        return
 
     # Credit: http://stackoverflow.com/a/1104641/4712439
     def does_dry_run_throw_error(self, cmd):
@@ -1055,26 +704,6 @@ class AFLSancovReporter:
 
         return out
 
-    def get_cycle_num(self, fuzz_dir, id_num):
-
-        ### default cycle
-        cycle_num = 0
-
-        if not os.path.isfile(fuzz_dir + '/plot_data'):
-            return cycle_num
-
-        with open(fuzz_dir + '/plot_data') as f:
-            for line in f:
-                ### unix_time, cycles_done, cur_path, paths_total, pending_total,...
-                ### 1427742641, 11, 54, 419, 45, 0, 2.70%, 0, 0, 9, 1645.47
-                vals = line.split(', ')
-                ### test the id number against the current path
-                if vals[2] == str(id_num):
-                    cycle_num = int(vals[1])
-                    break
-
-        return cycle_num
-
     @staticmethod
     def import_test_cases(qdir):
         return sorted(glob.glob(qdir + "/id:*"))
@@ -1095,27 +724,12 @@ class AFLSancovReporter:
         p.add_argument("--disable-cmd-redirection", action='store_true',
                        help="Disable redirection of command results to /dev/null",
                        default=False)
-        # p.add_argument("--disable-lcov-web", action='store_true',
-        #         help="Disable generation of all lcov web code coverage reports",
-        #         default=False)
         p.add_argument("--coverage-include-lines", action='store_true',
                        help="Include lines in zero-coverage status files",
                        default=False)
-        # p.add_argument("--enable-branch-coverage", action='store_true',
-        #         help="Include branch coverage in code coverage reports (may be slow)",
-        #         default=False)
         p.add_argument("--preserve-all-sancov-files", action='store_true',
                        help="Keep all sancov files (not usually necessary)",
                        default=False)
-        # p.add_argument("--disable-lcov-exclude-pattern", action='store_true',
-        #         help="Allow default /usr/include/* pattern to be included in lcov results",
-        #         default=False)
-        # p.add_argument("--lcov-exclude-pattern", type=str,
-        #         help="Set exclude pattern for lcov results",
-        #         default="/usr/include/\*")
-        p.add_argument("--afl-queue-id-limit", type=int,
-                       help="Limit the number of id:NNNNNN* files processed in the AFL queue/ directory",
-                       default=0)
         p.add_argument("-v", "--verbose", action='store_true',
                        help="Verbose mode", default=False)
         p.add_argument("-V", "--version", action='store_true',
@@ -1135,20 +749,14 @@ class AFLSancovReporter:
                        help="Path to llvm-symbolizer", default="llvm-symbolizer")
         p.add_argument("--bin-path", type=str,
                        help="Path to coverage instrumented binary")
-        p.add_argument("--dd-mode", action='store_true',
-                       help="Experimental! Enables delta debugging mode. In this mode, coverage traces of crashing input\n"
-                            "and it's non-crashing parent are diff'ed.",
-                       default=False)
+        p.add_argument("--crash-dir", type=str,
+                       help="Path to unique AFL crashes post triage")
         p.add_argument("--dd-num", type=int,
                        help="Experimental! Perform more compute intensive analysis of crashing input by comparing its"
                             "path profile with aggregated path profiles of N=dd-num randomly selected non-crashing inputs",
                        default=1)
         p.add_argument("--sancov-bug", action='store_true',
                        help="Sancov bug that occurs for certain coverage_dir env vars", default=False)
-        # p.add_argument("--dd-raw-queue-path", type=str,
-        #         help="Path to raw queue files (used in --dd-mode)")
-        # p.add_argument("--dd-crash-file", type=str,
-        #         help="Path to crashing input for deep analysis (used in --dd-mode)")
 
         return p.parse_args(args)
 
@@ -1165,11 +773,8 @@ class AFLSancovReporter:
             print "[*] --afl-fuzzing-dir missing"
             return False
 
-        # TODO: Hard-coded path. Move to cmdline arg.
-        self.unique_crash_path = self.args.afl_fuzzing_dir + '/unique'
-
-        if not os.path.isdir(self.unique_crash_path):
-            print "[*] There is no directory called 'unique' in --afl-fuzzing-dir"
+        if not self.args.crash_dir or not os.path.isdir(self.args.crash_dir):
+            print "[*] --crash-dir missing or not a dir"
             return False
 
         if not self.args.bin_path:
@@ -1243,9 +848,8 @@ class AFLSancovReporter:
         if create_cov_dirs:
             for k in ['top_dir', 'web_dir', 'cons_dir', 'diff_dir']:
                 os.mkdir(self.cov_paths[k])
-            if self.args.dd_mode:
-                for k in ['delta_diff_dir', 'dd_stash_dir', 'dd_filter_dir']:
-                    os.mkdir(self.cov_paths[k])
+            for k in ['delta_diff_dir', 'dd_stash_dir', 'dd_filter_dir']:
+                os.mkdir(self.cov_paths[k])
 
             ### write coverage results in the following format
             cfile = open(self.cov_paths['id_delta_cov'], 'w')
@@ -1270,19 +874,6 @@ class AFLSancovReporter:
         f.write("%s\n" % pstr)
         f.close()
         return
-
-    @staticmethod
-    def write_file(str, file):
-        f = open(file, 'w')
-        f.write("%s\n" % str)
-        f.close()
-        return
-
-    @staticmethod
-    def write_strlist_to_file(strlist, file):
-        with open(file, 'a') as thefile:
-            for item in strlist:
-                print>> thefile, item
 
     @classmethod
     def write_status(cls, status_file):
