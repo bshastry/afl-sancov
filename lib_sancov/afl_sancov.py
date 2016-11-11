@@ -31,7 +31,6 @@ from shutil import rmtree
 from sys import argv
 import re
 import glob
-from argparse import ArgumentParser
 import os
 import collections
 import json
@@ -47,7 +46,6 @@ class AFLSancovReporter:
     """Base class for the AFL Sancov reporter"""
 
     Version = __version__
-    Description = __desc__
     Want_Output = True
     No_Output = False
 
@@ -73,9 +71,9 @@ class AFLSancovReporter:
                                          r"(sync:(?P<sync>[\w|\-]+),)?src:(?P<id>\d+).*$")
 
 
-    def __init__(self, args):
+    def __init__(self, parsed_args):
 
-        self.args = self.parse_cmdline(args)
+        self.args = parsed_args
 
         self.cov_paths = {}
 
@@ -711,54 +709,6 @@ class AFLSancovReporter:
     @staticmethod
     def import_unique_crashes(dir):
         return sorted(glob.glob(dir + "/*id:*"))
-
-    def parse_cmdline(self, args):
-        p = ArgumentParser(self.Description)
-
-        p.add_argument("-e", "--coverage-cmd", type=str,
-                       help="Set command to exec (including args, and assumes code coverage support)")
-        p.add_argument("-d", "--afl-fuzzing-dir", type=str,
-                       help="top level AFL fuzzing directory")
-        p.add_argument("-O", "--overwrite", action='store_true',
-                       help="Overwrite existing coverage results", default=False)
-        p.add_argument("--disable-cmd-redirection", action='store_true',
-                       help="Disable redirection of command results to /dev/null",
-                       default=False)
-        p.add_argument("--coverage-include-lines", action='store_true',
-                       help="Include lines in zero-coverage status files",
-                       default=False)
-        p.add_argument("--preserve-all-sancov-files", action='store_true',
-                       help="Keep all sancov files (not usually necessary)",
-                       default=False)
-        p.add_argument("-v", "--verbose", action='store_true',
-                       help="Verbose mode", default=False)
-        p.add_argument("-V", "--version", action='store_true',
-                       help="Print version and exit", default=False)
-        p.add_argument("-q", "--quiet", action='store_true',
-                       help="Quiet mode", default=False)
-        p.add_argument("--sanitizer", type=str,
-                       help="Experimental! Indicates which sanitizer the binary has been instrumented with.\n"
-                            "Options are: asan, ubsan, defaulting to ubsan. Msan, and lsan are unsupported.",
-                       default="ubsan")
-        p.add_argument("--sancov-path", type=str,
-                       help="Path to sancov binary", default="sancov")
-        p.add_argument("--pysancov-path", type=str,
-                       help="Path to sancov.py script (in clang compiler-rt)",
-                       default="pysancov")
-        p.add_argument("--llvm-sym-path", type=str,
-                       help="Path to llvm-symbolizer", default="llvm-symbolizer")
-        p.add_argument("--bin-path", type=str,
-                       help="Path to coverage instrumented binary")
-        p.add_argument("--crash-dir", type=str,
-                       help="Path to unique AFL crashes post triage")
-        p.add_argument("--dd-num", type=int,
-                       help="Experimental! Perform more compute intensive analysis of crashing input by comparing its"
-                            "path profile with aggregated path profiles of N=dd-num randomly selected non-crashing inputs",
-                       default=1)
-        p.add_argument("--sancov-bug", action='store_true',
-                       help="Sancov bug that occurs for certain coverage_dir env vars", default=False)
-
-        return p.parse_args(args)
 
     def validate_args(self):
         if self.args.coverage_cmd:
