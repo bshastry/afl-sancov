@@ -23,7 +23,10 @@
 #  USA
 #
 
-from aflsancov import *
+import sys
+import os
+sys.path.insert(0, os.path.abspath('..'))
+from lib_sancov.afl_sancov import AFLSancovReporter
 import unittest
 import os
 import json
@@ -273,6 +276,3 @@ class TestAflSanCov(unittest.TestCase):
         reporter = AFLSancovReporter(args)
         # Checks incorrect llvm-sym path
         self.assertTrue(reporter.run())
-
-if __name__ == "__main__":
-    unittest.main()

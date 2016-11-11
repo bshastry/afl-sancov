@@ -32,10 +32,10 @@ from sys import argv
 import re
 import glob
 from argparse import ArgumentParser
-import sys, os
-import random
+import os
 import collections
 import json
+from lib_sancov import __version__, __desc__
 
 try:
     import subprocess32 as subprocess
@@ -46,8 +46,8 @@ except ImportError:
 class AFLSancovReporter:
     """Base class for the AFL Sancov reporter"""
 
-    Version = '1.1'
-    Description = 'A tool for spectrum based fault localization'
+    Version = __version__
+    Description = __desc__
     Want_Output = True
     No_Output = False
 
@@ -883,8 +883,3 @@ class AFLSancovReporter:
         f.write("command_line       : %s\n" % ' '.join(argv))
         f.close()
         return
-
-
-if __name__ == "__main__":
-    reporter = AFLSancovReporter(sys.argv[1:])
-    sys.exit(reporter.run())

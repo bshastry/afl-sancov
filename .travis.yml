@@ -23,6 +23,6 @@ before_install:
 
 install: ./install_deps.sh
 
-script: cd tests && ./afl-sancov-generator.sh && coverage run test-afl-sancov.py
+script: cd tests && ./afl-sancov-generator.sh && coverage run --rcfile=../.coveragerc ../setup.py test
 after_success:
         - coveralls
