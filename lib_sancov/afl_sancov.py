@@ -1,31 +1,4 @@
-#!/usr/bin/env python
-#
-#  File: afl-sancov
-#
-#  Version: 1.1
-#
-#  Purpose: Leverage sancov towards coverage consolidation, program spec analysis etc.
-#
-#  Forked off of afl-cov (ver 0.5): Copyright (C) 2015 Michael Rash (mbr@cipherdyne.org)
-#  Port to coverage sanitizer by Bhargava Shastry (bshastry@sec.t-labs.tu-berlin.de)
-#
-#  License (GNU General Public License):
-#
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; either version 2
-#  of the License, or (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301,
-#  USA
-#
+#!/usr/bin/env python2
 
 from shutil import rmtree
 from sys import argv
@@ -34,7 +7,7 @@ import glob
 import os
 import collections
 import json
-from lib_sancov import __version__, __desc__
+from lib_sancov import __version__
 
 try:
     import subprocess32 as subprocess

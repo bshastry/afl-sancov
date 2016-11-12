@@ -90,16 +90,18 @@ class TestAflSanCov(unittest.TestCase):
         self.assertFalse(AFLSancovReporter(parse_cmdline(self.desc, ['spectrum', '--version'])).run())
 
     def test_overwrite_dir(self):
-        args = ['spectrum', '-d', './afl-out', '-e "cat AFL_FILE | ./test-sancov-ubsan"', '--bin-path={}/test-sancov-ubsan'.format(os.getcwd()),
-                '--sancov-path=/usr/bin/sancov-3.8', '--llvm-sym-path=/usr/bin/llvm-symbolizer-3.8',
-                '--pysancov-path=/usr/local/bin/pysancov', '--crash-dir={}/unique'.format(os.getcwd())]
+        args = ['--coverage-cmd=cat AFL_FILE | ./test-sancov-ubsan', '--bin-path={}/test-sancov-ubsan'.format(os.getcwd()),
+                '--crash-dir={}/unique'.format(os.getcwd())]
+        args.extend(['spectrum', '-d', './afl-out', '--sancov-path=/usr/bin/sancov-3.8', '--llvm-sym-path=/usr/bin/llvm-symbolizer-3.8',
+                '--pysancov-path=/usr/local/bin/pysancov'])
         reporter = AFLSancovReporter(parse_cmdline(self.desc, args))
         self.assertTrue(reporter.run())
 
     def test_ddmode_ubsan(self):
-        args = ['spectrum', '-d', './afl-out', '-e', 'cat AFL_FILE | ./test-sancov-ubsan', '--bin-path={}/test-sancov-ubsan'.format(os.getcwd()),
-                '--sancov-path=/usr/bin/sancov-3.8', '--llvm-sym-path=/usr/bin/llvm-symbolizer-3.8',
-                '--pysancov-path=/usr/local/bin/pysancov', '--crash-dir={}/unique'.format(os.getcwd()),'--overwrite']
+        args = ['--coverage-cmd=cat AFL_FILE | ./test-sancov-ubsan', '--bin-path={}/test-sancov-ubsan'.format(os.getcwd()),
+                '--crash-dir={}/unique'.format(os.getcwd())]
+        args.extend(['spectrum', '-d', './afl-out', '--sancov-path=/usr/bin/sancov-3.8', '--llvm-sym-path=/usr/bin/llvm-symbolizer-3.8',
+                '--pysancov-path=/usr/local/bin/pysancov', '--overwrite'])
         reporter = AFLSancovReporter(parse_cmdline(self.desc, args))
         self.assertFalse(reporter.run())
         self.assertTrue(os.path.exists(self.dd_dir),
@@ -113,10 +115,10 @@ class TestAflSanCov(unittest.TestCase):
                         "Delta-diff file {} does not match".format(self.dd_filename2))
 
     def test_ddmode_ubsan_sancov_bug(self):
-        args = ['spectrum', '-d', './afl-out', '-e', 'cat AFL_FILE | ./test-sancov-ubsan', '--bin-path={}/test-sancov-ubsan'.format(os.getcwd()),
-                '--sancov-path=/usr/bin/sancov-3.8', '--llvm-sym-path=/usr/bin/llvm-symbolizer-3.8',
-                '--pysancov-path=/usr/local/bin/pysancov', '--crash-dir={}/unique'.format(os.getcwd()),'--overwrite',
-                '--sancov-bug']
+        args = ['--coverage-cmd=cat AFL_FILE | ./test-sancov-ubsan', '--bin-path={}/test-sancov-ubsan'.format(os.getcwd()),
+                '--crash-dir={}/unique'.format(os.getcwd())]
+        args.extend(['spectrum', '-d', './afl-out', '--sancov-path=/usr/bin/sancov-3.8', '--llvm-sym-path=/usr/bin/llvm-symbolizer-3.8',
+                '--pysancov-path=/usr/local/bin/pysancov', '--overwrite', '--sancov-bug'])
         reporter = AFLSancovReporter(parse_cmdline(self.desc, args))
         self.assertFalse(reporter.run())
         self.assertTrue(os.path.exists(self.dd_dir),
@@ -130,10 +132,10 @@ class TestAflSanCov(unittest.TestCase):
                         "Delta-diff file {} does not match".format(self.dd_filename2))
 
     def test_ddnum_ubsan(self):
-        args = ['spectrum', '-d', './afl-out', '-e', 'cat AFL_FILE | ./test-sancov-ubsan', '--bin-path={}/test-sancov-ubsan'.format(os.getcwd()),
-                '--sancov-path=/usr/bin/sancov-3.8', '--llvm-sym-path=/usr/bin/llvm-symbolizer-3.8',
-                '--pysancov-path=/usr/local/bin/pysancov', '--overwrite', '--dd-num=3',
+        args = ['--coverage-cmd=cat AFL_FILE | ./test-sancov-ubsan', '--bin-path={}/test-sancov-ubsan'.format(os.getcwd()),
                 '--crash-dir={}/unique'.format(os.getcwd())]
+        args.extend(['spectrum', '-d', './afl-out', '--sancov-path=/usr/bin/sancov-3.8', '--llvm-sym-path=/usr/bin/llvm-symbolizer-3.8',
+                '--pysancov-path=/usr/local/bin/pysancov', '--overwrite', '--dd-num=3'])
         reporter = AFLSancovReporter(parse_cmdline(self.desc, args))
         self.assertFalse(reporter.run())
         self.assertTrue(os.path.exists(self.dd_dir),
@@ -147,11 +149,10 @@ class TestAflSanCov(unittest.TestCase):
                         "Delta-diff file {} does not match".format(self.dd_filename2))
 
     def test_ddnum_ubsan_sancov_bug(self):
-        args = ['spectrum', '-d', './afl-out', '-e', 'cat AFL_FILE | ./test-sancov-ubsan',
-                '--bin-path={}/test-sancov-ubsan'.format(os.getcwd()),
-                '--sancov-path=/usr/bin/sancov-3.8', '--llvm-sym-path=/usr/bin/llvm-symbolizer-3.8',
-                '--pysancov-path=/usr/local/bin/pysancov', '--overwrite', '--dd-num=3',
-                '--crash-dir={}/unique'.format(os.getcwd()), '--sancov-bug']
+        args = ['--coverage-cmd=cat AFL_FILE | ./test-sancov-ubsan', '--bin-path={}/test-sancov-ubsan'.format(os.getcwd()),
+                '--crash-dir={}/unique'.format(os.getcwd())]
+        args.extend(['spectrum', '-d', './afl-out', '--sancov-path=/usr/bin/sancov-3.8', '--llvm-sym-path=/usr/bin/llvm-symbolizer-3.8',
+                '--pysancov-path=/usr/local/bin/pysancov', '--overwrite', '--dd-num=3', '--sancov-bug'])
         reporter = AFLSancovReporter(parse_cmdline(self.desc, args))
         self.assertFalse(reporter.run())
         self.assertTrue(os.path.exists(self.dd_dir),
@@ -166,11 +167,10 @@ class TestAflSanCov(unittest.TestCase):
 
 
     def test_ddmode_asan(self):
-        args = ['spectrum', '-d', './afl-out', '-e', 'cat AFL_FILE | ./test-sancov-asan',
-                '--bin-path={}/test-sancov-asan'.format(os.getcwd()),
-                '--sancov-path=/usr/bin/sancov-3.8', '--llvm-sym-path=/usr/bin/llvm-symbolizer-3.8',
-                '--pysancov-path=/usr/local/bin/pysancov', '--crash-dir={}/unique'.format(os.getcwd()), '--overwrite',
-                '--sanitizer=asan']
+        args = ['--coverage-cmd=cat AFL_FILE | ./test-sancov-asan', '--bin-path={}/test-sancov-asan'.format(os.getcwd()),
+                '--crash-dir={}/unique'.format(os.getcwd())]
+        args.extend(['spectrum', '-d', './afl-out', '--sancov-path=/usr/bin/sancov-3.8', '--llvm-sym-path=/usr/bin/llvm-symbolizer-3.8',
+                '--pysancov-path=/usr/local/bin/pysancov', '--overwrite', '--sanitizer=asan'])
         reporter = AFLSancovReporter(parse_cmdline(self.desc, args))
         self.assertFalse(reporter.run())
         self.assertTrue(os.path.exists(self.dd_dir),
@@ -185,11 +185,10 @@ class TestAflSanCov(unittest.TestCase):
 
 
     def test_ddmode_asan_sancov_bug(self):
-        args = ['spectrum', '-d', './afl-out', '-e', 'cat AFL_FILE | ./test-sancov-asan',
-                '--bin-path={}/test-sancov-asan'.format(os.getcwd()),
-                '--sancov-path=/usr/bin/sancov-3.8', '--llvm-sym-path=/usr/bin/llvm-symbolizer-3.8',
-                '--pysancov-path=/usr/local/bin/pysancov', '--crash-dir={}/unique'.format(os.getcwd()), '--overwrite',
-                '--sancov-bug', '--sanitizer=asan']
+        args = ['--coverage-cmd=cat AFL_FILE | ./test-sancov-asan', '--bin-path={}/test-sancov-asan'.format(os.getcwd()),
+                '--crash-dir={}/unique'.format(os.getcwd())]
+        args.extend(['spectrum', '-d', './afl-out', '--sancov-path=/usr/bin/sancov-3.8', '--llvm-sym-path=/usr/bin/llvm-symbolizer-3.8',
+                '--pysancov-path=/usr/local/bin/pysancov', '--overwrite', '--sanitizer=asan', '--sancov-bug'])
         reporter = AFLSancovReporter(parse_cmdline(self.desc, args))
         self.assertFalse(reporter.run())
         self.assertTrue(os.path.exists(self.dd_dir),
@@ -204,11 +203,10 @@ class TestAflSanCov(unittest.TestCase):
 
 
     def test_ddnum_asan(self):
-        args = ['spectrum', '-d', './afl-out', '-e', 'cat AFL_FILE | ./test-sancov-asan',
-                '--bin-path={}/test-sancov-asan'.format(os.getcwd()),
-                '--sancov-path=/usr/bin/sancov-3.8', '--llvm-sym-path=/usr/bin/llvm-symbolizer-3.8',
-                '--pysancov-path=/usr/local/bin/pysancov', '--overwrite', '--dd-num=3',
-                '--crash-dir={}/unique'.format(os.getcwd()), '--sanitizer=asan']
+        args = ['--coverage-cmd=cat AFL_FILE | ./test-sancov-asan', '--bin-path={}/test-sancov-asan'.format(os.getcwd()),
+                '--crash-dir={}/unique'.format(os.getcwd())]
+        args.extend(['spectrum', '-d', './afl-out', '--sancov-path=/usr/bin/sancov-3.8', '--llvm-sym-path=/usr/bin/llvm-symbolizer-3.8',
+                '--pysancov-path=/usr/local/bin/pysancov', '--overwrite', '--sanitizer=asan', '--dd-num=3'])
         reporter = AFLSancovReporter(parse_cmdline(self.desc, args))
         self.assertFalse(reporter.run())
         self.assertTrue(os.path.exists(self.dd_dir),
@@ -223,11 +221,11 @@ class TestAflSanCov(unittest.TestCase):
 
 
     def test_ddnum_asan_sancov_bug(self):
-        args = ['spectrum', '-d', './afl-out', '-e', 'cat AFL_FILE | ./test-sancov-asan',
-                '--bin-path={}/test-sancov-asan'.format(os.getcwd()),
-                '--sancov-path=/usr/bin/sancov-3.8', '--llvm-sym-path=/usr/bin/llvm-symbolizer-3.8',
-                '--pysancov-path=/usr/local/bin/pysancov', '--overwrite', '--dd-num=3',
-                '--crash-dir={}/unique'.format(os.getcwd()), '--sancov-bug', '--sanitizer=asan']
+        args = ['--coverage-cmd=cat AFL_FILE | ./test-sancov-asan', '--bin-path={}/test-sancov-asan'.format(os.getcwd()),
+                '--crash-dir={}/unique'.format(os.getcwd())]
+        args.extend(['spectrum', '-d', './afl-out', '--sancov-path=/usr/bin/sancov-3.8', '--llvm-sym-path=/usr/bin/llvm-symbolizer-3.8',
+                '--pysancov-path=/usr/local/bin/pysancov', '--overwrite', '--sanitizer=asan', '--sancov-bug',
+                     '--dd-num=3'])
         reporter = AFLSancovReporter(parse_cmdline(self.desc, args))
         self.assertFalse(reporter.run())
         self.assertTrue(os.path.exists(self.dd_dir),
@@ -241,40 +239,51 @@ class TestAflSanCov(unittest.TestCase):
                         "Delta-diff file {} does not match".format(self.dd_filename2))
 
     def test_validate_cov_cmd(self):
-        args = ['spectrum']
+
+        common_args = []
+        spectrum_args = ['spectrum']
+        args = common_args + spectrum_args
         reporter = AFLSancovReporter(parse_cmdline(self.desc, args))
         # Checks no cov cmd
         self.assertTrue(reporter.run())
-        args = ['spectrum', '-e', 'cat FILE | ./test-sancov-asan']
+        common_args = ['--coverage-cmd=cat FILE | ./test-sancov-asan']
+        args = common_args + spectrum_args
         reporter = AFLSancovReporter(parse_cmdline(self.desc, args))
         # Checks incorrect cov cmd
         self.assertTrue(reporter.run())
-        args = ['spectrum', '-e', 'cat AFL_FILE | ./test-sancov-asan']
+        common_args = ['--coverage-cmd=cat AFL_FILE | ./test-sancov-asan']
+        args = common_args + spectrum_args
         reporter = AFLSancovReporter(parse_cmdline(self.desc, args))
         # Checks no afl fuzz dir
         self.assertTrue(reporter.run())
-        args.extend(['-d', './afl-out'])
+        spectrum_args.extend(['-d', './afl-out'])
+        args = common_args + spectrum_args
         reporter = AFLSancovReporter(parse_cmdline(self.desc, args))
         # Checks no crash dir
         self.assertTrue(reporter.run())
-        args.extend(['--crash-dir={}/unique'.format(os.getcwd())])
+        common_args.extend(['--crash-dir={}/unique'.format(os.getcwd())])
+        args = common_args + spectrum_args
         reporter = AFLSancovReporter(parse_cmdline(self.desc, args))
         # Checks no bin path
         self.assertTrue(reporter.run())
-        args.extend(['--bin-path={}/test-sancov-noexist'.format(os.getcwd())])
+        common_args.extend(['--bin-path={}/test-sancov-noexist'.format(os.getcwd())])
+        args = common_args + spectrum_args
         reporter = AFLSancovReporter(parse_cmdline(self.desc, args))
         # Checks incorrect bin path
         self.assertTrue(reporter.run())
-        args[len(args)-1] = '--bin-path={}/test-sancov-ubsan'.format(os.getcwd())
-        args.extend(['--sancov-path=sancov-noexist'])
+        common_args[len(common_args)-1] = '--bin-path={}/test-sancov-ubsan'.format(os.getcwd())
+        spectrum_args.extend(['--sancov-path=sancov-noexist'])
+        args = common_args + spectrum_args
         reporter = AFLSancovReporter(parse_cmdline(self.desc, args))
         # Checks incorrect sancov path
         self.assertTrue(reporter.run())
-        args[len(args)-1] = '--pysancov-path=pysancov-noexist'
+        spectrum_args[len(spectrum_args)-1] = '--pysancov-path=pysancov-noexist'
+        args = common_args + spectrum_args
         reporter = AFLSancovReporter(parse_cmdline(self.desc, args))
         # Checks incorrect pysancov path
         self.assertTrue(reporter.run())
-        args[len(args)-1] = '--llvm-sym-path=llvm-symbolizer-noexist'
+        spectrum_args[len(spectrum_args)-1] = '--llvm-sym-path=llvm-symbolizer-noexist'
+        args = common_args + spectrum_args
         reporter = AFLSancovReporter(parse_cmdline(self.desc, args))
         # Checks incorrect llvm-sym path
         self.assertTrue(reporter.run())
