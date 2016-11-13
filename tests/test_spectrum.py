@@ -42,27 +42,27 @@ class TestAflSanCov(unittest.TestCase):
     tmp_file     = './tmp_cmd.out'
 
     top_out_dir  = './afl-out'
-    sancov_dir = top_out_dir + '/sancov'
-    dd_dir = sancov_dir + '/delta-diff'
+    aflczar_dir = top_out_dir + '/../afl-czar'
+    dd_dir = aflczar_dir + '/spectrum/dice'
     expects_dir = './expects'
-    expects_ddmode_ubsan_dir = expects_dir + '/ddmode/ubsan'
-    expects_ddnum_ubsan_dir = expects_dir + '/ddnum/ubsan'
-    expects_ddmode_asan_dir = expects_dir + '/ddmode/asan'
-    expects_ddnum_asan_dir = expects_dir + '/ddnum/asan'
+    expects_dice_single_ubsan_dir = expects_dir + '/dice/single/ubsan'
+    expects_dice_multiple_ubsan_dir = expects_dir + '/dice/multiple/ubsan'
+    expects_dice_single_asan_dir = expects_dir + '/dice/single/asan'
+    expects_dice_multiple_asan_dir = expects_dir + '/dice/multiple/asan'
     dd_filename1 = '/HARDEN:0001,SESSION000:id:000000,sig:06,src:000003,op:havoc,rep:2.json'
     dd_filename2 = '/HARDEN:0001,SESSION001:id:000000,sig:06,src:000003,op:havoc,rep:4.json'
     dd_file1 = dd_dir + dd_filename1
     dd_file2 = dd_dir + dd_filename2
     ## UBSAN
-    expects_ddmode_ubsan_file1 = expects_ddmode_ubsan_dir + dd_filename1
-    expects_ddmode_ubsan_file2 = expects_ddmode_ubsan_dir + dd_filename2
-    expects_ddnum_ubsan_file1 = expects_ddnum_ubsan_dir + dd_filename1
-    expects_ddnum_ubsan_file2 = expects_ddnum_ubsan_dir + dd_filename2
+    expects_ddmode_ubsan_file1 = expects_dice_single_ubsan_dir + dd_filename1
+    expects_ddmode_ubsan_file2 = expects_dice_single_ubsan_dir + dd_filename2
+    expects_ddnum_ubsan_file1 = expects_dice_multiple_ubsan_dir + dd_filename1
+    expects_ddnum_ubsan_file2 = expects_dice_multiple_ubsan_dir + dd_filename2
     ## ASAN
-    expects_ddmode_asan_file1 = expects_ddmode_asan_dir + dd_filename1
-    expects_ddmode_asan_file2 = expects_ddmode_asan_dir + dd_filename2
-    expects_ddnum_asan_file1 = expects_ddnum_asan_dir + dd_filename1
-    expects_ddnum_asan_file2 = expects_ddnum_asan_dir + dd_filename2
+    expects_ddmode_asan_file1 = expects_dice_single_asan_dir + dd_filename1
+    expects_ddmode_asan_file2 = expects_dice_single_asan_dir + dd_filename2
+    expects_ddnum_asan_file1 = expects_dice_multiple_asan_dir + dd_filename1
+    expects_ddnum_asan_file2 = expects_dice_multiple_asan_dir + dd_filename2
 
     expected_line_substring = 'afl-sancov/tests/test-sancov.c:main:25:3'
     desc = "Test harness"

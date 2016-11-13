@@ -8,6 +8,7 @@ import os
 import collections
 import json
 from lib_sancov import __version__
+from common.utilities import import_test_cases, import_unique_crashes
 
 try:
     import subprocess32 as subprocess
@@ -93,19 +94,30 @@ class AFLSancovReporter:
 
         return not rv
 
-    def deserialize_stats(self):
-        for idx, tpl in enumerate(self.crashdd_pos_list):
-            self.crashdd_pos_list[idx] = ':'.join(str(val) for val in tpl)
+    def join_tuples_in_list(self, list):
+        for idx, tpl in enumerate(list):
+            list[idx] = ':'.join(str(val) for val in tpl)
         return
 
-    def dd_obtain_stats_collections(self, crashfile, jsonfilename, parentfile=None):
+    def jsonify_slice(self, slice_list, crashfile, jsonfilename):
+        dict = {"crashing-input": crashfile, "slice-node-spec": []}
+        self.join_tuples_in_list(slice_list)
+        counter = collections.Counter(slice_list)
+        sorted_list = counter.most_common()
+        for tpl in sorted_list:
+            dict['slice-node-spec'].append({'line': tpl[0], 'count': tpl[1]})
+        dict['slice-linecount'] = len(sorted_list)
+
+        self.jsonify_dict(jsonfilename, dict)
+
+    def jsonify_dice(self, crashfile, jsonfilename, parentfile=None):
 
         if parentfile:
             dict = {"crashing-input": crashfile, "parent-input": parentfile, "diff-node-spec": []}
         else:
             dict = {"crashing-input": crashfile, "diff-node-spec": []}
 
-        self.deserialize_stats()
+        self.join_tuples_in_list(self.crashdd_pos_list)
 
         counter = collections.Counter(self.crashdd_pos_list)
 
@@ -121,23 +133,23 @@ class AFLSancovReporter:
         dict['dice-linecount'] = dice_linecount
         dict['shrink-percent'] = 100 - (float(dice_linecount)/slice_linecount)*100
 
-        self.dd_write_json(jsonfilename, dict)
+        self.jsonify_dict(jsonfilename, dict)
 
         return
 
-    def dd_write_json(self, filename, dict):
+    def jsonify_dict(self, filename, dict):
         with open(filename, "w") as file:
             json.dump(dict, file, indent=4)
 
-    def write_result_as_json(self, cbasename, pbasename=None):
-        crashdd_outfile = self.cov_paths['delta_diff_dir'] + '/' + cbasename + '.json'
+    def write_dice_as_json(self, cbasename, pbasename=None):
+        crashdd_outfile = self.cov_paths['dice_dir'] + '/' + cbasename + '.json'
 
         # header = "diff crash ({}) -> parent ({})".format(cbasename, pbasename)
         # self.write_file(header, crashdd_outfile)
         if pbasename:
-            self.dd_obtain_stats_collections(cbasename, crashdd_outfile, pbasename)
+            self.jsonify_dice(cbasename, crashdd_outfile, pbasename)
         else:
-            self.dd_obtain_stats_collections(cbasename, crashdd_outfile)
+            self.jsonify_dice(cbasename, crashdd_outfile)
 
         ## Reset state to be safe
         self.crashdd_pos_list = []
@@ -146,11 +158,11 @@ class AFLSancovReporter:
         ### Stash away all raw sancov files
         stash_dst = self.cov_paths['dd_stash_dir']
         if os.path.isdir(stash_dst):
-            for file in sorted(glob.glob(self.cov_paths['delta_diff_dir'] + '/*.sancov')):
+            for file in sorted(glob.glob(self.cov_paths['dice_dir'] + '/*.sancov')):
                 os.rename(file, stash_dst + '/' + os.path.basename(file))
 
         # Remove covered.txt
-        covered = self.cov_paths['delta_diff_dir'] + '/covered.txt'
+        covered = self.cov_paths['dice_dir'] + '/covered.txt'
         if os.path.isfile(covered):
             os.remove(covered)
 
@@ -191,7 +203,7 @@ class AFLSancovReporter:
         #### The output should be written to delta-diff dir
         #### as afl_input namesake witha sancov extension
         ### raw sancov file
-        self.cov_paths['parent_sancov_raw'] = self.cov_paths['delta_diff_dir'] + \
+        self.cov_paths['parent_sancov_raw'] = self.cov_paths['dice_dir'] + \
                                               '/' + pbasename + '.sancov'
         self.cov_paths['parent_afl'] = pbasename
 
@@ -204,7 +216,7 @@ class AFLSancovReporter:
 
         if self.args.sancov_bug:
             sancovfile = "".join(glob.glob("*.sancov"))
-            cov_cmd = 'mv {} {}'.format(sancovfile, self.cov_paths['delta_diff_dir'])
+            cov_cmd = 'mv {} {}'.format(sancovfile, self.cov_paths['dice_dir'])
             self.run_cmd(cov_cmd, self.No_Output)
 
         # This renames default sancov file to specified filename
@@ -220,7 +232,7 @@ class AFLSancovReporter:
 
         cbasename = os.path.basename(crash_fname)
 
-        self.cov_paths['crash_sancov_raw'] = self.cov_paths['delta_diff_dir'] + \
+        self.cov_paths['crash_sancov_raw'] = self.cov_paths['dice_dir'] + \
                                              '/' + cbasename + '.sancov'
 
         self.cov_paths['crash_afl'] = cbasename
@@ -244,13 +256,13 @@ class AFLSancovReporter:
             mapfilename = "".join(glob.glob("*.sancov.map"))
 
             cov_cmd = 'mv {} {} {}'.format(rawfilename, mapfilename,
-                                            self.cov_paths['delta_diff_dir'])
+                                            self.cov_paths['dice_dir'])
             self.run_cmd(cov_cmd, self.No_Output)
 
-        globstrraw = os.path.basename("".join(glob.glob(self.cov_paths['delta_diff_dir'] + "/*.sancov.raw")))
-        globstrmap = os.path.basename("".join(glob.glob(self.cov_paths['delta_diff_dir'] + "/*.sancov.map")))
+        globstrraw = os.path.basename("".join(glob.glob(self.cov_paths['dice_dir'] + "/*.sancov.raw")))
+        globstrmap = os.path.basename("".join(glob.glob(self.cov_paths['dice_dir'] + "/*.sancov.map")))
         ### Run pysancov rawunpack before calling rename
-        self.run_cmd("cd {}; pysancov rawunpack {} ; rm {} {}".format(self.cov_paths['delta_diff_dir'],
+        self.run_cmd("cd {}; pysancov rawunpack {} ; rm {} {}".format(self.cov_paths['dice_dir'],
                                                                       globstrraw, globstrraw, globstrmap),
                      self.No_Output)
         # self.run_cmd("cd pysancov rawunpack " + globstrraw + " ; rm " + globstrraw + " " + globstrmap, self.No_Output)
@@ -273,7 +285,7 @@ class AFLSancovReporter:
         :return:
         '''
 
-        crash_files = self.import_unique_crashes(self.args.crash_dir)
+        crash_files = import_unique_crashes(self.args.crash_dir)
         num_crash_files = len(crash_files)
 
         self.logr("\n*** Imported %d new crash files from: %s\n" \
@@ -285,7 +297,7 @@ class AFLSancovReporter:
         fuzzdirs = self.cov_paths['dirs'].keys()
         queue_files = []
         for val in fuzzdirs:
-            queue_files.extend(self.import_test_cases(val + '/queue'))
+            queue_files.extend(import_test_cases(val + '/queue'))
 
         crash_file_counter = 0
 
@@ -345,7 +357,10 @@ class AFLSancovReporter:
                 # Extend the global list with current crash delta diff
                 self.crashdd_pos_list.extend(self.crashdd_pos_report)
 
-            self.write_result_as_json(cbasename)
+            self.write_dice_as_json(cbasename)
+            # Write Crash coverage to slice dir
+            self.jsonify_slice(list(self.prev_pos_report), cbasename,
+                               self.cov_paths['slice_dir'] + '/' + cbasename + '.json')
 
         self.cleanup()
         return True
@@ -359,7 +374,7 @@ class AFLSancovReporter:
         :return:
         '''
 
-        crash_files = self.import_unique_crashes(self.args.crash_dir)
+        crash_files = import_unique_crashes(self.args.crash_dir)
         num_crash_files = len(crash_files)
 
         self.logr("\n*** Imported %d new crash files from: %s\n" \
@@ -402,7 +417,11 @@ class AFLSancovReporter:
             self.crashdd_pos_list = sorted(self.crashdd_pos_report, \
                                            key=lambda cov_entry: (cov_entry[0], cov_entry[2], cov_entry[3]))
 
-            self.write_result_as_json(cbasename, pbasename)
+            self.write_dice_as_json(cbasename, pbasename)
+
+            # Write Crash coverage to slice dir
+            self.jsonify_slice(list(self.curr_pos_report), cbasename,
+                               self.cov_paths['slice_dir'] + '/' + cbasename + '.json')
 
         self.cleanup()
         return True
@@ -461,18 +480,11 @@ class AFLSancovReporter:
 
     def init_tracking(self):
 
-        self.cov_paths['top_dir'] = self.args.afl_fuzzing_dir + '/sancov'
-        # Web dir is for sancov 3.9 only. Currently unsupported.
-        self.cov_paths['web_dir'] = self.cov_paths['top_dir'] + '/web'
-        # Consolidated coverage for non-crashing (i.e., queue) inputs only.
-        self.cov_paths['cons_dir'] = self.cov_paths['top_dir'] + '/cons-cov'
-        # Diff for queue inputs only.
-        self.cov_paths['diff_dir'] = self.cov_paths['top_dir'] + '/diff'
+        self.cov_paths['top_dir'] = self.args.afl_fuzzing_dir + '/../afl-czar'
         self.cov_paths['log_file'] = self.cov_paths['top_dir'] + '/afl-sancov.log'
         self.cov_paths['tmp_out'] = self.cov_paths['top_dir'] + '/cmd-out.tmp'
 
         ### global coverage results
-        self.cov_paths['id_delta_cov'] = self.cov_paths['top_dir'] + '/id-delta-cov'
         self.cov_paths['zero_cov'] = self.cov_paths['top_dir'] + '/zero-cov'
         self.cov_paths['pos_cov'] = self.cov_paths['top_dir'] + '/pos-cov'
 
@@ -482,10 +494,12 @@ class AFLSancovReporter:
         self.cov_paths['parent_sancov_raw'] = ''
         self.cov_paths['crash_sancov_raw'] = ''
         # Diff in delta debug mode
-        self.cov_paths['delta_diff_dir'] = self.cov_paths['top_dir'] + '/delta-diff'
-        self.cov_paths['dd_stash_dir'] = self.cov_paths['delta_diff_dir'] + '/.raw'
-        self.cov_paths['dd_filter_dir'] = self.cov_paths['delta_diff_dir'] + '/.filter'
-        self.cov_paths['dd_final_stats'] = self.cov_paths['delta_diff_dir'] + '/final_stats.dd'
+        self.cov_paths['spectrum_dir'] = self.cov_paths['top_dir'] + '/spectrum'
+        self.cov_paths['slice_dir'] = self.cov_paths['spectrum_dir'] + '/slice'
+        self.cov_paths['dice_dir'] = self.cov_paths['spectrum_dir'] + '/dice'
+        self.cov_paths['dd_stash_dir'] = self.cov_paths['dice_dir'] + '/.raw'
+        self.cov_paths['dd_filter_dir'] = self.cov_paths['dice_dir'] + '/.filter'
+        self.cov_paths['dd_final_stats'] = self.cov_paths['dice_dir'] + '/final_stats.dd'
 
         if self.args.overwrite:
             self.init_mkdirs()
@@ -675,14 +689,6 @@ class AFLSancovReporter:
 
         return out
 
-    @staticmethod
-    def import_test_cases(qdir):
-        return sorted(glob.glob(qdir + "/id:*"))
-
-    @staticmethod
-    def import_unique_crashes(dir):
-        return sorted(glob.glob(dir + "/*id:*"))
-
     def validate_args(self):
         if self.args.coverage_cmd:
             if 'AFL_FILE' not in self.args.coverage_cmd:
@@ -769,16 +775,10 @@ class AFLSancovReporter:
             create_cov_dirs = 1
 
         if create_cov_dirs:
-            for k in ['top_dir', 'web_dir', 'cons_dir', 'diff_dir']:
+            for k in ['top_dir']:
                 os.mkdir(self.cov_paths[k])
-            for k in ['delta_diff_dir', 'dd_stash_dir', 'dd_filter_dir']:
+            for k in ['spectrum_dir', 'slice_dir', 'dice_dir', 'dd_stash_dir', 'dd_filter_dir']:
                 os.mkdir(self.cov_paths[k])
-
-            ### write coverage results in the following format
-            cfile = open(self.cov_paths['id_delta_cov'], 'w')
-            cfile.write("# id:NNNNNN*_file, cycle, src_file, coverage_type, fcn/line\n")
-            cfile.close()
-
         return
 
     @staticmethod

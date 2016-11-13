@@ -1,4 +1,5 @@
 from argparse import ArgumentParser
+import glob
 
 SPECTRUM_HELP = "Utility to obtain crash spectrum using LLVM SanitizerCoverage"
 RUNTIME_HELP = "Utility to obtain runtime information using GDB and Sanitizers"
@@ -17,9 +18,6 @@ def parse_cmdline(description, args, spectrum=None, runtime=None):
 
     # Command 'spectrum'
     spectrum_parser = subparsers.add_parser('spectrum', help=SPECTRUM_HELP)
-
-    # spectrum_parser.add_argument("-e", "--coverage-cmd", type=str,
-    #                              help="Set command to exec (including args, and assumes code coverage support)")
     spectrum_parser.add_argument("-d", "--afl-fuzzing-dir", type=str,
                                  help="top level AFL fuzzing directory")
     spectrum_parser.add_argument("-O", "--overwrite", action='store_true',
@@ -50,10 +48,6 @@ def parse_cmdline(description, args, spectrum=None, runtime=None):
                                  default="pysancov")
     spectrum_parser.add_argument("--llvm-sym-path", type=str,
                                  help="Path to llvm-symbolizer", default="llvm-symbolizer")
-    # spectrum_parser.add_argument("--bin-path", type=str,
-    #                              help="Path to coverage instrumented binary")
-    # spectrum_parser.add_argument("--crash-dir", type=str,
-    #                              help="Path to unique AFL crashes post triage")
     spectrum_parser.add_argument("--dd-num", type=int,
                                  help="Experimental! Perform more compute intensive analysis of crashing input by comparing its"
                         "path profile with aggregated path profiles of N=dd-num randomly selected non-crashing inputs",
@@ -71,3 +65,9 @@ def parse_cmdline(description, args, spectrum=None, runtime=None):
     runtime_parser.set_defaults(func=runtime)
 
     return argParser.parse_args(args)
+
+def import_test_cases(qdir):
+    return sorted(glob.glob(qdir + "/id:*"))
+
+def import_unique_crashes(dir):
+    return sorted(glob.glob(dir + "/*id:*"))
