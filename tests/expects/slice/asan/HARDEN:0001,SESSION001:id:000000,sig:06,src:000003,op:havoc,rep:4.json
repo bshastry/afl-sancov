@@ -1,0 +1,18 @@
+{
+    "crashing-input": "HARDEN:0001,SESSION001:id:000000,sig:06,src:000003,op:havoc,rep:4", 
+    "slice-linecount": 3, 
+    "slice-node-spec": [
+        {
+            "count": 1, 
+            "line": "/home/bhargava/work/gitlab/afl-sancov/tests/test-sancov.c:main:25:3"
+        }, 
+        {
+            "count": 1, 
+            "line": "/home/bhargava/work/gitlab/afl-sancov/tests/test-sancov.c:main:10:0"
+        }, 
+        {
+            "count": 1, 
+            "line": "/home/bhargava/work/gitlab/afl-sancov/tests/test-sancov.c:main:24:14"
+        }
+    ]
+}
